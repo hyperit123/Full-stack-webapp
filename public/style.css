@@ -1,3 +1,4 @@
+
 /*color pallete for the website*/
 :root{
     --background: #161616;
@@ -20,7 +21,7 @@ header{
     padding: 0.4%;
     display: flex;
     flex-direction: row;
-    gap: 0.2%;
+    gap: 5px;
     border-radius: 8px;
 }
 /* makes the pfp loade a defult picture and makes it pixelated so that you can see the art I made :)*/
@@ -30,6 +31,30 @@ header{
     height: 84px;
     width: 84px;
     border: 3px solid var(--background);
+}
+/* Match the viewer to the main profile image */
+#pfp-viewer {
+    image-rendering: pixelated;
+    border-radius: 100%;
+    height: 84px;
+    width: 84px;
+    border: 3px solid var(--background);
+    display: block;
+    margin-bottom: 8px;
+    margin-left: auto;
+    margin-right: auto;
+}
+#pfp-btn {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    font-size: medium;
+    border-radius: 4px;
+    background-color: var(--active);
+    border: 3px solid var(--background);
+    color: var(--accent-color);
 }
 /*makes the items in the div line up downwords*/
 #ch-things{
@@ -302,7 +327,7 @@ label{
 #traitsTab.active,
 #inventoryTab.active {
     background-color: #333333;
-    border-width: 10px;
+    border-width: 2px;
     border-image: url(pressed.png) 30 round;
 }
 #actionsTab:hover,
@@ -459,7 +484,7 @@ label{
 #Exstra-points label {
     display:inline-flex;
     align-items:center; 
-    gap:5px
+    gap:5px;
 }
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
@@ -467,6 +492,7 @@ input[type=number]::-webkit-outer-spin-button {
 }
 #add-check-box{
     width: 40%;
+    margin-bottom: 5px;
 }
 .check-box-exstras{
     background-color: var(--secondery);
@@ -483,4 +509,35 @@ input[type=number]::-webkit-outer-spin-button {
     font-size: large;
     border-radius: 4px;
     width: 1fr;
+}
+#speed-edit, #speed{
+    font-size: medium;
+    display: flex;
+    flex-direction: row;
+    width: 35px;
+    height: 20px;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+    background-color: var(--background);
+    border-radius: 2px;
+    font-family: Arial, Helvetica, sans-serif;
+}
+#speed-container{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+    background-color: var(--background);
+    padding: 8px 4px 8px 4px;
+    border-radius: 4px;
+}
+#speed{
+    justify-content: center;
+    align-items: center;
+    width: 25px;
+    height: 35px;
+    font-size: xx-large;
+}
+#speed label{
+    font-size: large;
 }

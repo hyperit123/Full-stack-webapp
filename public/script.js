@@ -147,6 +147,19 @@ function addTabs(section) {
 let editbtn = document.getElementById("edit-btn");
 let overly = document.getElementById("overly");
 
+// Speed sync logic
+let speedEdit = document.getElementById("speed-edit");
+let speedDisplay = document.getElementById("speed");
+if (speedEdit && speedDisplay) {
+    // Sync edit to display
+    function updateSpeed() {
+        speedDisplay.value = speedEdit.value;
+    }
+    speedEdit.addEventListener("input", updateSpeed);
+    // Initial sync
+    updateSpeed();
+}
+
 editbtn.addEventListener("click", function() {
     overly.style.display = "flex";
 });
@@ -396,6 +409,17 @@ addcheckbox.addEventListener("click", function() {
     div.className = 'check-boxs';
     chbc.appendChild(div);
 
+    // Delete button for this checkbox group
+    let delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'delete-btn';
+    delBtn.style.marginLeft = '8px';
+    delBtn.addEventListener('click', () => {
+        chbc.remove();
+    });
+    // Place delete button at the end of container row
+    chbc.appendChild(delBtn);
+
     // Function to update checkboxes based on inputval
     function updateexstra() {
         let desiredexstra = parseInt(inputval.value) || 0;
@@ -425,6 +449,11 @@ function getCharacterData() {
     data.background = document.getElementById("background").value;
     data.level = document.getElementById("level-change").value;
     data.exstrapoints = document.getElementById("Exstra-points").value;
+    // Save status
+    const statusSel = document.getElementById('status');
+    // Save speed
+    data.speed = document.getElementById("speed-edit")?.value || "";
+    data.status = statusSel ? statusSel.value : null;
 
     // Coin values
     data.coins = {
@@ -440,50 +469,61 @@ function getCharacterData() {
         data.stats[stat] = val;
     });
 
-    // Wounds checkboxes
-    let numberOfWoundsEl = document.querySelector('.stat-edit #tn');
-    let numberOfWounds = numberOfWoundsEl ? parseInt(numberOfWoundsEl.value, 10) : 0;
 
+    // --- Save wounds and stamina checkboxes state ---
+    function getCheckboxStates(container) {
+        return Array.from(container.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
+    }
+    // Wounds
     let woundsModEl = document.getElementById('wounds-mod');
     let woundsMod = woundsModEl ? parseInt(woundsModEl.value, 10) : 0;
-
-    // Save into data object
-    data.woundsTotal = numberOfWounds;
+    let woundsContainer = document.getElementById('wounds').getElementsByClassName('check-boxs')[0];
     data.woundsMod = woundsMod;
+    data.woundsChecked = getCheckboxStates(woundsContainer);
 
-
-
-    // Stamina checkboxes (use dex for stamina base)
-    let numberOfStaminaEl = document.querySelector('.stat-edit #dex');
-    let numberOfStamina = numberOfStaminaEl ? parseInt(numberOfStaminaEl.value, 10) : 0;
-
-    // Grab the stamina modifier (from input #stamina-mod)
+    // Stamina
     let staminaModEl = document.getElementById('stamina-mod');
     let staminaMod = staminaModEl ? parseInt(staminaModEl.value, 10) : 1;
-
-    // Calculate stamina total as in updatestamina()
-    let staminaTotal = Math.max(1, staminaMod);
-    data.staminaTotal = staminaTotal;
+    let staminaContainer = document.getElementById('stamina').getElementsByClassName('check-boxs')[0];
     data.staminaMod = staminaMod;
+    data.staminaChecked = getCheckboxStates(staminaContainer);
 
 
     // Dynamic text boxes (actions, traits, inventory, etc.)
     data.textboxes = {};
     document.querySelectorAll(".textbox-wrapper textarea").forEach(tb => {
-        data.textboxes[tb.id] = tb.value;
+        // Save value and size (rows, cols, inline width/height if set)
+        data.textboxes[tb.id] = {
+            value: tb.value,
+            rows: tb.rows,
+            cols: tb.cols,
+            styleWidth: tb.style.width || null,
+            styleHeight: tb.style.height || null
+        };
     });
 
-    // Extra checkboxes
+    // Extra checkboxes (save checked state)
     data.extraCheckboxes = [];
     document.querySelectorAll(".check-boxs-container").forEach(container => {
+        if (container.id === 'wounds' || container.id === 'stamina') return;
         let numInput = container.querySelector(".inputval");
         let labelInput = container.querySelector(".check-box-exstras");
         let num = numInput ? numInput.value : null;
         let label = labelInput ? labelInput.value : null;
+        let checked = Array.from(container.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
         if (num !== null && label !== null && num !== "" && label !== "") {
-            data.extraCheckboxes.push({number: num, text: label});
+            data.extraCheckboxes.push({number: num, text: label, checked});
         }
     });
+
+    // Profile picture (save as data URL if available)
+    const pfpImg = document.getElementById('pfp');
+    if (pfpImg) {
+        // If the src is an object URL or file path, try to keep current value;
+        // Prefer a data URL for portability when loading from JSON
+        data.pfpDataUrl = pfpImg.dataset.pfpDataUrl || null;
+        data.pfpSrc = (!data.pfpDataUrl ? pfpImg.src : null);
+    }
 
     return data;
 };
@@ -513,6 +553,7 @@ document.getElementById("save-btn").addEventListener("click", () => {
     URL.revokeObjectURL(url);
 });
 
+// Function to reload all dynamic elements
 
 
 function pagereload() {
@@ -522,9 +563,353 @@ function pagereload() {
     safeCall(updaterace);
     safeCall(updateclass);
     safeCall(updatebackground);
-    safeCall(updatechn)
-    safeCall(levelload)
-    safeCall(calculatePoints)
+    safeCall(updatechn);
+    safeCall(levelload);
+    safeCall(calculatePoints);
+    // Also update cash/status
+    if (typeof updateCashAndSaveStatus === 'function') safeCall(updateCashAndSaveStatus);
+    // Refresh speed display
+    if (typeof speedEdit !== 'undefined' && typeof speedDisplay !== 'undefined') {
+        if (speedEdit && speedDisplay) speedDisplay.value = speedEdit.value;
+    }
 }
 
+// Add Dash bonus action to Bonus Actions tab
+function addDashBonusAction() {
+    const bonusActionsContainer = document.getElementById('bonus-actions-container');
+    if (!bonusActionsContainer) return;
+    // Remove old Dash if present
+    const oldDash = bonusActionsContainer.querySelector('.dash-action');
+    if (oldDash) oldDash.remove();
+    // Get speed value
+    let speedVal = parseInt(document.getElementById('speed').value) || 5;
+    let dashStamina = 1;
+    // Create Dash element
+    const dash = document.createElement('p');
+    dash.className = 'dash-action ';
+    dash.textContent = `Dash [moves ${speedVal * 2} tiles, ${dashStamina} stamina] `;
+    // Insert at top
+    bonusActionsContainer.insertBefore(dash, bonusActionsContainer.firstChild);
+}
+// Update Dash action whenever speed changes
+if (speedEdit) {
+    speedEdit.addEventListener('input', addDashBonusAction);
+}
+document.addEventListener('DOMContentLoaded', addDashBonusAction);
+
 // End of script.js
+// --- Status cash setter ---
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSel = document.getElementById('status');
+    const setCashBtn = document.getElementById('set-cash-btn');
+    const creditsField = document.getElementById('credits');
+    if (statusSel && setCashBtn && creditsField) {
+        setCashBtn.addEventListener('click', function() {
+            let cashAmount = 0;
+            switch (statusSel.value) {
+                case 'Wealthy': cashAmount = 1000; break;
+                case 'Middle': cashAmount = 500; break;
+                case 'Poor': cashAmount = 50; break;
+                case 'Destitute': cashAmount = 0; break;
+                default: cashAmount = 0;
+            }
+            creditsField.value = cashAmount;
+        });
+    }
+});
+// --- Load from JSON and restore UI state ---
+// --- Status cash setter ---
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSel = document.getElementById('status');
+    const creditsField = document.getElementById('credits');
+    if (statusSel && creditsField) {
+        function updateCashAndSaveStatus() {
+            let cashAmount = 0;
+            switch (statusSel.value) {
+                case 'Wealthy': cashAmount = 1000; break;
+                case 'Middle': cashAmount = 500; break;
+                case 'Poor': cashAmount = 50; break;
+                case 'Destitute': cashAmount = 0; break;
+                default: cashAmount = 0;
+            }
+            creditsField.value = cashAmount;
+        }
+        statusSel.addEventListener('change', updateCashAndSaveStatus);
+        // Set initial value on page load
+        updateCashAndSaveStatus();
+    }
+});
+function loadCharacterData(data) {
+    // Basic info
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? el.value; };
+    setVal("chn", data.name || "");
+    setVal("gender", data.gender || "");
+    setVal("race", data.race || "");
+    setVal("class", data.class || "");
+    setVal("background", data.background || "");
+    setVal("level-change", data.level ?? 1);
+    setVal("Exstra-points", data.exstrapoints ?? 0);
+    // Restore speed
+    setVal("speed-edit", data.speed ?? 5);
+    setVal("speed", data.speed ?? 5);
+
+    // Reflect editable overlay fields if they exist
+    setVal("chn-edit", data.name || "");
+    setVal("gender-edit", data.gender || "");
+    setVal("race-edit", data.race || "");
+    setVal("class-edit", data.class || "");
+    setVal("background-edit", data.background || "");
+
+    // Coins (optional block if you store them)
+    if (data.coins) {
+        setVal("credits", data.coins.credits);
+        setVal("doch", data.coins.doch);
+        setVal("renown", data.coins.renown);
+    }
+    // Restore status and update credits
+    if (typeof data.status === 'string') {
+        const statusSel = document.getElementById('status');
+        if (statusSel) {
+            statusSel.value = data.status;
+            // Also update credits field to match status
+            let cashAmount = 0;
+            switch (data.status) {
+                case 'Wealthy': cashAmount = 1000; break;
+                case 'Middle': cashAmount = 500; break;
+                case 'Poor': cashAmount = 50; break;
+                case 'Destitute': cashAmount = 0; break;
+                default: cashAmount = 0;
+            }
+        }
+    }
+        // Restore status
+        if (typeof data.status === 'string') {
+            const statusSel = document.getElementById('status');
+            if (statusSel) statusSel.value = data.status;
+        }
+
+    // Stats on editable side drive the rest
+    if (data.stats) {
+        ['ws','bs','str','tn','dex','per','int','wp','fel'].forEach(stat => {
+            const editEl = document.querySelector(`.stat-edit #${stat}`);
+            const dispEl = document.querySelector(`.stat #${stat}`);
+            if (editEl) editEl.value = data.stats[stat] ?? editEl.value;
+            if (dispEl) dispEl.value = data.stats[stat] ?? dispEl.value;
+        });
+    }
+
+    // Wounds/Stamina modifiers
+    setVal("wounds-mod", data.woundsMod);
+    setVal("stamina-mod", data.staminaMod);
+
+    // Restore wounds/stamina checked state after regeneration
+    setTimeout(() => {
+        // Wounds
+        if (Array.isArray(data.woundsChecked)) {
+            let woundsContainer = document.getElementById('wounds').getElementsByClassName('check-boxs')[0];
+            let cbs = woundsContainer.querySelectorAll('input[type="checkbox"]');
+            data.woundsChecked.forEach((v, i) => { if (cbs[i]) cbs[i].checked = v; });
+        }
+        // Stamina
+        if (Array.isArray(data.staminaChecked)) {
+            let staminaContainer = document.getElementById('stamina').getElementsByClassName('check-boxs')[0];
+            let cbs = staminaContainer.querySelectorAll('input[type="checkbox"]');
+            data.staminaChecked.forEach((v, i) => { if (cbs[i]) cbs[i].checked = v; });
+        }
+    }, 0);
+
+    // Recompute dependent UI using existing helpers
+    safeCall(updateWounds);
+    safeCall(updatestamina);
+    safeCall(calculatePoints);
+    safeCall(levelload);
+    safeCall(updaterace);
+    safeCall(updategender);
+    safeCall(updateclass);
+    safeCall(updatebackground);
+    safeCall(updatechn);
+
+    // Restore dynamic textboxes
+    if (data.textboxes) {
+        // Clear all current wrappers
+        document.querySelectorAll(".textbox-wrapper").forEach(w => w.remove());
+
+        Object.entries(data.textboxes).forEach(([id, payload]) => {
+            const match = id.match(/^([a-z\-]+)-textbox-\d+$/i);
+            if (!match) return;
+            const section = match[1];
+            const sectionContainer = document.getElementById(section.toLowerCase() + "-container");
+            if (!sectionContainer) return;
+
+            const textBox = document.createElement("textarea");
+            textBox.rows = (payload && payload.rows) ? payload.rows : 2;
+            textBox.cols = (payload && payload.cols) ? payload.cols : 30;
+            textBox.className = "text-box";
+            textBox.placeholder = id;
+            textBox.id = id;
+            textBox.value = (payload && payload.value) ? payload.value : "";
+            if (payload && payload.styleWidth) textBox.style.width = payload.styleWidth;
+            if (payload && payload.styleHeight) textBox.style.height = payload.styleHeight;
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "X";
+            deleteBtn.className = "delete-btn";
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "textbox-wrapper";
+            wrapper.appendChild(textBox);
+            wrapper.appendChild(deleteBtn);
+
+            deleteBtn.addEventListener("click", () => {
+                sectionContainer.removeChild(wrapper);
+            });
+
+            sectionContainer.appendChild(wrapper);
+        });
+    }
+
+    // Restore extra checkbox groups
+    if (Array.isArray(data.extraCheckboxes)) {
+        const root = document.getElementById("check-boxs");
+        if (root) {
+            // Remove only dynamically added groups; keep base wounds/stamina
+            root.querySelectorAll('.check-boxs-container').forEach(c => {
+                if (c.id !== 'wounds' && c.id !== 'stamina') c.remove();
+            });
+            if (typeof totalcheckboxs !== "undefined") totalcheckboxs = 0;
+
+            data.extraCheckboxes.forEach(({ number, text, checked }) => {
+                if (typeof totalcheckboxs !== "undefined") totalcheckboxs += 1;
+
+                const chbc = document.createElement("div");
+                chbc.className = "check-boxs-container";
+                chbc.style = "display: grid; grid-template-columns: 60% 20%; gap: 10px;";
+                root.appendChild(chbc);
+
+                const inputforchc = document.createElement("input");
+                inputforchc.placeholder = `check box ${totalcheckboxs || 1}`;
+                inputforchc.className = "check-box-exstras";
+                inputforchc.value = text ?? "";
+                chbc.appendChild(inputforchc);
+
+                const inputval = document.createElement("input");
+                inputval.type = "number";
+                inputval.min = 1;
+                inputval.max = 40;
+                inputval.className = "inputval";
+                inputval.value = (number ?? 1);
+                chbc.appendChild(inputval);
+
+                const div = document.createElement("div");
+                div.className = "check-boxs";
+                chbc.appendChild(div);
+
+                function updateexstra() {
+                    const desired = parseInt(inputval.value) || 0;
+                    div.innerHTML = "";
+                    for (let i = 0; i < desired; i++) {
+                        const checkbox = document.createElement("input");
+                        checkbox.type = "checkbox";
+                        div.appendChild(checkbox);
+                    }
+                    // Restore checked state if available
+                    if (Array.isArray(checked)) {
+                        div.querySelectorAll('input[type="checkbox"]').forEach((cb, idx) => {
+                            cb.checked = !!checked[idx];
+                        });
+                    }
+                }
+                updateexstra();
+                inputval.addEventListener("input", updateexstra);
+            });
+        }
+    }
+// Utility: Count checked checkboxes in a container
+function countCheckedCheckboxes(container) {
+    return Array.from(container.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked).length;
+}
+
+    // Ensure tabs are consistent after load
+    safeCall(() => updateTabs('Actions'));
+
+    // Restore profile picture
+    const pfpImg = document.getElementById('pfp');
+    if (pfpImg) {
+        if (data.pfpDataUrl) {
+            pfpImg.src = data.pfpDataUrl;
+            pfpImg.dataset.pfpDataUrl = data.pfpDataUrl;
+        } else if (data.pfpSrc) {
+            pfpImg.src = data.pfpSrc;
+            delete pfpImg.dataset.pfpDataUrl;
+        }
+        const pfpViewer = document.getElementById('pfp-viewer');
+        if (pfpViewer) {
+            pfpViewer.src = pfpImg.src;
+        }
+    }
+}
+
+// Wire up a Load button + file input (if present)
+(() => {
+    const loadBtn = document.getElementById("load-btn");
+    const loadFile = document.getElementById("load-file"); // <input type="file" accept="application/json">
+
+    if (loadBtn && loadFile) {
+        loadBtn.addEventListener("click", () => loadFile.click());
+    }
+
+    if (loadFile) {
+        loadFile.addEventListener("change", async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                loadCharacterData(data);
+                // Re-run initializers to reattach events and sync UI
+                safeCall(pagereload);
+            } catch (err) {
+                console.error("Failed to load character JSON:", err);
+                alert("Could not load JSON file. See console for details.");
+            } finally {
+                e.target.value = ""; // allow re-selecting the same file
+            }
+        });
+    }
+})();
+
+// Profile picture loader (file input -> image + store data URL)
+(() => {
+    const pfpFile = document.getElementById('pfp-file');
+    const pfpImg = document.getElementById('pfp');
+    const pfpViewer = document.getElementById('pfp-viewer');
+    const pfpBtn = document.getElementById('pfp-btn');
+
+    if (pfpBtn && pfpFile) {
+        pfpBtn.addEventListener('click', () => pfpFile.click());
+    }
+
+    if (pfpFile && pfpImg) {
+        pfpFile.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = reader.result;
+                    if (typeof dataUrl === 'string') {
+                        pfpImg.src = dataUrl;
+                        if (pfpViewer) pfpViewer.src = dataUrl;
+                        pfpImg.dataset.pfpDataUrl = dataUrl; // keep data URL for saving
+                    }
+                };
+                reader.readAsDataURL(file);
+            } catch (err) {
+                console.error('Failed to load profile picture:', err);
+                alert('Could not load profile picture.');
+            } finally {
+                e.target.value = '';
+            }
+        });
+    }
+})();

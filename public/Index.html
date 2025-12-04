@@ -10,6 +10,7 @@
 <body>
     <header>   
         <img src="pfp.png" alt="png" id="pfp">
+        <input id="pfp-file" type="file" accept="image/*" style="display:none" />
         <div id="ch-things">
             <input class="text" id="chn" disabled>
             <div id="small">
@@ -19,6 +20,10 @@
                 <strong id="level">Level: <input disabled id="level-value"></strong>
             </div>
         </div>
+        <div id="speed-container">
+            <input type="text" id="speed" disabled>
+            <label for="speed">Speed <br>(in tiles)</label>
+        </div>
         <button id="edit-btn"><img src="edit.png" alt="png" height="35px" width="35px"></button>
     </header>
     <div id="main-content">
@@ -26,52 +31,52 @@
             <div id="stats">
                 <span class="title" style="grid-column: 1/ span 4;">Stats and Coin</span>
                 <div class="stat">
-                    <input type="text" disabled id="ws" value="">
+                    <input type="text" disabled id="ws" >
                     <label for="ws">Weapon Skill (WS)</label>
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="bs" value="">
+                    <input type="text" disabled id="bs" >
                     <label for="bs">Ballistic Skill (BS)</label>
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="tn" value="">
+                    <input type="text" disabled id="tn" >
                     <label for="tn"> Toughness (Tn)</label>
                 </div>
                 <div class="coin">
                     <label for="credits">Credits: </label>
-                    <input type="text" id="credits" value="18">
+                    <input type="text" id="credits" >
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="str" value="">
+                    <input type="text" disabled id="str" >
                     <label for="str">Strength (Str)</label>
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="dex" value="">
+                    <input type="text" disabled id="dex" >
                     <label for="dex">Dexterity (Dex)</label>
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="int" value="">
+                    <input type="text" disabled id="int" >
                     <label for="int">Intelligence (INT)</label>
                 </div>
                 <div class="coin">
                     <label for="doch">Doch: </label>
-                    <input type="text" id="doch" value="18">
+                    <input type="text" id="doch" >
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="per" value="">
+                    <input type="text" disabled id="per" >
                     <label for="per">Perception (PER)</label>
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="wp" value="">
+                    <input type="text" disabled id="wp" >
                     <label for="wp">Willpower (WP)</label>
                 </div>
                 <div class="stat">
-                    <input type="text" disabled id="fel" value="">
+                    <input type="text" disabled id="fel" >
                     <label for="fel"> Fellowship (FEL)</label>
                 </div>
                 <div class="coin">
                     <label for="renown">Renown: </label>
-                    <input type="text" id="renown" value="18">
+                    <input type="text" id="renown" >
                 </div>
             </div>
             <div id="check-boxs">
@@ -88,83 +93,89 @@
                 </div>
             </div>
             <button id="add-check-box">Add box</button>
-            <button id="save-btn">save</button>
+            <div>
+                <button id="save-btn">save</button>
+                <button id="load-btn">Load</button>
+                <input id="load-file" type="file" accept="application/json" style="display:none" />
+            </div>
         </div>
+            
         <div id="right-side">
-    <div class="tabgrub">
-        <button id="actionsTab" class="active">Actions</button>
-        <button id="traitsTab">Traits</button>
-        <button id="inventoryTab">Inventory</button>
-    </div>
-    <div id="Actions" class="active">
-        <div class="sections">
-            <h3>Actions</h3>
-            <div id="actions-container" class="textarea-containers">
-                <p class="organic">Recover [1 stamina + Blank Check of 3 dice]</p>
+            <div class="tabgrub">
+                <button id="actionsTab" class="active">Actions</button>
+                <button id="traitsTab">Traits</button>
+                <button id="inventoryTab">Inventory</button>
             </div>
-            <button id="add-action-button">add text</button>
-        </div>
-        <div class="sections">
-            <h3>Bonus Actions</h3>
-            <div id="bonus-actions-container" class="textarea-containers">
-                <p class="organic">Breathe [Recover 1 stamina]</p>
-                <p class="mech"> Overclock [(Must be done before a full action) Select a full action to do and double its stamina cost in return for doubling numbers rolled (Snake Eyes not included)]</p>
+            <div id="Actions" class="active">
+                <div class="sections">
+                    <h3>Actions</h3>
+                    <div id="actions-container" class="textarea-containers">
+                        <p class="organic">Recover [1 stamina + Blank Check of 3 dice]</p>
+                    </div>
+                    <button id="add-action-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Bonus Actions</h3>
+                    <div id="bonus-actions-container" class="textarea-containers">
+                        <p class="organic">Breathe [Recover 1 stamina]</p>
+                        <p class="mech"> Overclock [(Must be done before a full action) Select a full action to do and double its stamina cost in return for doubling numbers rolled (Snake Eyes not included)]</p>
+                    </div>
+                    <button id="add-bonus-action-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Other</h3>
+                    <div id="other-container" class="textarea-containers">
+                        <input type="text" id="background" disabled>
+                    </div>
+                    <button id="add-other-button">add text</button>
+                </div>
             </div>
-            <button id="add-bonus-action-button">add text</button>
-        </div>
-        <div class="sections">
-            <h3>Other</h3>
-            <div id="other-container" class="textarea-containers">
-                <input type="text" id="background" disabled>
+            <div id="Traits" class="Traits">
+                <div class="sections">
+                    <h3>Traits</h3>
+                    <div id="traits-container" class="textarea-containers">
+                    </div>
+                    <button id="add-trait-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Resistances</h3>
+                    <div id="resistances-container">
+                        <p class="organic">ED</p>
+                        <p class="mech">Cold, Laceration, Piercing, Flash</p>
+                    </div>
+                    <button id="add-resistences-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Immunities</h3>
+                    <div id="immunities-container">
+                        <p class="mech">Immunity to Poison, Plague, Gas</p>
+                    </div>
+                    <button id="add-immunities-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Weaknesses</h3>
+                    <div id="weaknesses-container">
+                        <p class="mech"> Arc, ED</p>
+                    </div>
+                    <button id="add-weaknesses-button">add text</button>
+                </div>
             </div>
-            <button id="add-other-button">add text</button>
-        </div>
-    </div>
-    <div id="Traits" class="Traits">
-        <div class="sections">
-            <h3>Traits</h3>
-            <div id="traits-container" class="textarea-containers">
+            <div id="Inventory" class="Inventory">
+                <div class="sections">
+                    <h3>Inventory</h3>
+                    <div id="inventory-container" class="textarea-containers">
+                    </div>
+                    <button id="add-inventory-button">add text</button>
+                </div>
             </div>
-            <button id="add-trait-button">add text</button>
         </div>
-        <div class="sections">
-            <h3>Resistances</h3>
-            <div id="resistances-container">
-                <p class="organic">ED</p>
-                <p class="mech">Cold, Laceration, Piercing, Flash</p>
-            </div>
-            <button id="add-resistences-button">add text</button>
-        </div>
-        <div class="sections">
-            <h3>Immunities</h3>
-            <div id="immunities-container">
-                <p class="mech">Immunity to Poison, Plague, Gas</p>
-            </div>
-            <button id="add-immunities-button">add text</button>
-        </div>
-        <div class="sections">
-            <h3>Weaknesses</h3>
-            <div id="weaknesses-container">
-                <p class="mech"> Arc, ED</p>
-            </div>
-            <button id="add-weaknesses-button">add text</button>
-        </div>
-    </div>
-    <div id="Inventory" class="Inventory">
-        <div class="sections">
-            <h3>Inventory</h3>
-            <div id="inventory-container" class="textarea-containers">
-            </div>
-            <button id="add-inventory-button">add text</button>
-        </div>
-    </div>
-</div>
-
     </div>
 
     <div id="overly">
         <div class="edit-character-box" id="top">
             <h2>Edit Character</h2>
+            <img id="pfp-viewer" src="pfp.png" alt="Profile preview" style="max-width: 160px; border-radius: 8px;" />
+            <button id="pfp-btn" title="Change picture">Change Picture</button>
             <label for="chn-edit">Character Name:<input type="text" id="chn-edit" placeholder="Character name her" style="width: 250px;" maxlength="31"></label>
             <label for="gender-edit">Gender:
                 <select id="gender-edit" style="width: 90px;">
@@ -269,6 +280,7 @@
                     </option>
                 </select>
             </label>
+            <label for="speed-edit">Speed (in tiles):<input type="number" id="speed-edit" value="5"></label>
         <label for="class-edit"> Class:
             <select id="class-edit">
                 <option value="Gunslinger" title="Masters of ranged combat, excelling at precision, quick-draws, and critical hits.">Gunslinger</option>
@@ -300,6 +312,12 @@
                 <option value="Starport Rat" title="Quick and clever survivors of bustling trade hubs, adept at navigating urban chaos.">Starport Rat</option>
             </select>
         </label>
+        <label for="status">Status:<select id="status">
+            <option value="Wealthy">Wealthy</option>
+            <option value="Middle">Middle</option>
+            <option value="Poor">Poor</option>
+            <option value="Destitute">Destitute</option>
+        </select></label>
         <label for="level-change">Level:<input type="number" id="level-change" value="1" min="1"></label>
         </div>
         <div class="edit-character-box" id="mid">
