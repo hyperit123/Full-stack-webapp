@@ -1,50 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Node + SQLite Demo (No Express)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node + SQLite Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        form {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background: white;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .error {
+            color: #d9534f;
+            margin-top: 10px;
+        }
+        .success {
+            color: #5cb85c;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <h1>User Registration</h1>
     <form id="userForm">
-    <input type="text" name="name" placeholder="Name" required />
-    <input type="email" name="email" placeholder="Email" required />
-    <button type="submit">Add User</button>
+        <input type="text" name="name" placeholder="Name" required />
+        <input type="email" name="email" placeholder="Email" required />
+        <button type="submit">Add User</button>
+        <div id="message"></div>
     </form>
 
     <h2>Users</h2>
     <ul id="userList"></ul>
 
     <script>
-    const form = document.getElementById("userForm");
-    const userList = document.getElementById("userList");
+        const form = document.getElementById("userForm");
+        const userList = document.getElementById("userList");
+        const message = document.getElementById("message");
 
-    async function loadUsers() {
-        const res = await fetch("/users");
-        const data = await res.json();
-        userList.innerHTML = "";
-        data.users.forEach(u => {
-        const li = document.createElement("li");
-        li.textContent = `${u.name} (${u.email})`;
-        userList.appendChild(li);
-        });
-    }
+        async function loadUsers() {
+            try {
+                const res = await fetch("/users");
+                const data = await res.json();
+                userList.innerHTML = "";
+                
+                if (data.users && data.users.length > 0) {
+                    data.users.forEach(u => {
+                        const li = document.createElement("li");
+                        li.textContent = `${u.name} (${u.email})`;
+                        userList.appendChild(li);
+                    });
+                } else {
+                    userList.innerHTML = "<li>No users yet. Add one above!</li>";
+                }
+            } catch (error) {
+                console.error("Error loading users:", error);
+                userList.innerHTML = "<li class='error'>Error loading users</li>";
+            }
+        }
 
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const formData = new FormData(form);
-        await fetch("/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            name: formData.get("name"),
-            email: formData.get("email")
-        })
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            message.textContent = "";
+            
+            const formData = new FormData(form);
+            
+            try {
+                const res = await fetch("/users", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: formData.get("name"),
+                        email: formData.get("email")
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.error) {
+                    message.className = "error";
+                    message.textContent = `Error: ${data.error}`;
+                } else {
+                    message.className = "success";
+                    message.textContent = "User added successfully!";
+                    form.reset();
+                    loadUsers();
+                    
+                    setTimeout(() => {
+                        message.textContent = "";
+                    }, 3000);
+                }
+            } catch (error) {
+                message.className = "error";
+                message.textContent = "Error adding user";
+                console.error("Error:", error);
+            }
         });
-        form.reset();
+
+        // Load users on page load
         loadUsers();
-    });
-
-    loadUsers();
     </script>
 </body>
 </html>
