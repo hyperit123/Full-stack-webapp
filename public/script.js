@@ -100,6 +100,26 @@ function addTabs(section) {
     textBox.placeholder = `${section} ${boxIndex}`;
     textBox.id = `${section}-textbox-${boxIndex}`;
 
+    // Restore size from localStorage if available
+    const sizeKey = `textarea-size-${textBox.id}`;
+    const savedSize = localStorage.getItem(sizeKey);
+    if (savedSize) {
+        try {
+            const { width, height } = JSON.parse(savedSize);
+            if (width) textBox.style.width = width + 'px';
+            if (height) textBox.style.height = height + 'px';
+        } catch (e) {}
+    }
+
+    // Save size on mouseup (after resize) and input
+    function saveTextareaSize() {
+        const width = textBox.offsetWidth;
+        const height = textBox.offsetHeight;
+        localStorage.setItem(sizeKey, JSON.stringify({ width, height }));
+    }
+    textBox.addEventListener('mouseup', saveTextareaSize);
+    textBox.addEventListener('input', saveTextareaSize);
+
     // Create delete button
     let deleteBtn = document.createElement('button');
     deleteBtn.textContent = "X";
@@ -398,6 +418,18 @@ function levelload() {
 // Initial generation on page load
 document.addEventListener("DOMContentLoaded", () => {
     pagereload();
+    // Restore textarea sizes for all loaded textareas
+    document.querySelectorAll('.text-box').forEach(textBox => {
+        const sizeKey = `textarea-size-${textBox.id}`;
+        const savedSize = localStorage.getItem(sizeKey);
+        if (savedSize) {
+            try {
+                const { width, height } = JSON.parse(savedSize);
+                if (width) textBox.style.width = width + 'px';
+                if (height) textBox.style.height = height + 'px';
+            } catch (e) {}
+        }
+    });
 });
 
 function safeCall(fn) {
@@ -452,7 +484,6 @@ addcheckbox.addEventListener("click", function() {
     delBtn.addEventListener('click', () => {
         chbc.remove();
     });
-    // Place delete button at the end of container row
     chbc.appendChild(delBtn);
 
     // Function to update checkboxes based on inputval
@@ -588,6 +619,7 @@ document.getElementById("save-btn").addEventListener("click", () => {
     URL.revokeObjectURL(url);
 });
 
+
 // --- Status Effects Viewer Logic ---
 function updateStatusEffectsHeaderViewer() {
     const list = document.getElementById('status-effects-header-list');
@@ -595,7 +627,6 @@ function updateStatusEffectsHeaderViewer() {
     list.innerHTML = '';
     const container = document.getElementById('status-effects-container');
     if (!container) return;
-    // Get all textarea values in the status effects tab
     const effects = Array.from(container.querySelectorAll('textarea'))
         .map(tb => tb.value.trim())
         .filter(val => val.length > 0);
@@ -610,30 +641,14 @@ function updateStatusEffectsHeaderViewer() {
     });
 }
 
-// Update viewer when status effects change
 document.addEventListener('input', function(e) {
     if (e.target.closest('#status-effects-container')) {
         updateStatusEffectsHeaderViewer();
     }
 });
-// Also update on tab switch (in case of programmatic changes)
 if (typeof statusEffectsTab !== 'undefined') {
     statusEffectsTab.addEventListener('click', updateStatusEffectsHeaderViewer);
 }
-// Initial update on page load
-document.addEventListener('DOMContentLoaded', updateStatusEffectsHeaderViewer);
-
-// Update viewer when status effects change
-document.addEventListener('input', function(e) {
-    if (e.target.closest('#status-effects-container')) {
-        updateStatusEffectsHeaderViewer();
-    }
-});
-// Also update on tab switch (in case of programmatic changes)
-if (typeof statusEffectsTab !== 'undefined') {
-    statusEffectsTab.addEventListener('click', updateStatusEffectsHeaderViewer);
-}
-// Initial update on page load
 document.addEventListener('DOMContentLoaded', updateStatusEffectsHeaderViewer);
 
 // Function to reload all dynamic elements
@@ -832,6 +847,10 @@ function loadCharacterData(data) {
             textBox.id = id;
             textBox.value = (payload && payload.value) ? payload.value : "";
 
+            // Restore size from loaded data
+            if (payload && payload.styleWidth) textBox.style.width = payload.styleWidth;
+            if (payload && payload.styleHeight) textBox.style.height = payload.styleHeight;
+
             const deleteBtn = document.createElement("button");
             deleteBtn.textContent = "X";
             deleteBtn.className = "delete-btn";
@@ -843,7 +862,6 @@ function loadCharacterData(data) {
 
             deleteBtn.addEventListener("click", () => {
                 sectionContainer.removeChild(wrapper);
-                // If this is the status effects section, update the header viewer
                 if (sectionContainer.id === 'status-effects-container') {
                     if (typeof updateStatusEffectsHeaderViewer === 'function') {
                         updateStatusEffectsHeaderViewer();
@@ -853,7 +871,6 @@ function loadCharacterData(data) {
 
             sectionContainer.appendChild(wrapper);
         });
-        // After all textboxes are restored, update the status effects header viewer
         if (typeof updateStatusEffectsHeaderViewer === 'function') {
             updateStatusEffectsHeaderViewer();
         }
@@ -894,6 +911,18 @@ function loadCharacterData(data) {
                 const div = document.createElement("div");
                 div.className = "check-boxs";
                 chbc.appendChild(div);
+
+                // Add delete button for loaded checkbox group
+                const delBtn = document.createElement('button');
+                delBtn.textContent = 'Delete';
+                delBtn.className = 'delete-btn';
+                delBtn.style.gridColumn = 'span 2';
+                delBtn.style.height = '30px';
+                delBtn.style.width = '70px';
+                delBtn.addEventListener('click', () => {
+                    chbc.remove();
+                });
+                chbc.appendChild(delBtn);
 
                 function updateexstra() {
                     const desired = parseInt(inputval.value) || 0;

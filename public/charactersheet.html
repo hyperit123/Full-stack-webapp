@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jack Knife</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="jackknife.png">
+</head>
+<body>
+    <header>   
+        <img src="pfp.png" alt="png" id="pfp">
+        <input id="pfp-file" type="file" accept="image/*" style="display:none" />
+        <div id="ch-things">
+            <input class="text" id="chn" disabled>
+            <div id="small">
+                <input id="gender" disabled >
+                <input id="race" disabled>
+                <input id="class" disabled>
+                <strong id="level">Level: <input disabled id="level-value"></strong>
+            </div>
+        </div>
+        <div id="speed-container">
+            <input type="text" id="speed" disabled>
+            <label for="speed">Speed <br>(in tiles)</label>
+        </div>
+        <div id="status-effects-header-viewer" class="status-effects-header-viewer">
+            <div class="status-effects-header-title">Status Effects</div>
+            <div id="status-effects-header-list"></div>
+        </div>
+        <button id="edit-btn"><img src="edit.png" alt="png" height="35px" width="35px"></button>
+    </header>
+    <div id="main-content">
+        <div id="left-side">
+            <div id="stats">
+                <span class="title" style="grid-column: 1/ span 4;">Stats and Coin</span>
+                <div class="stat">
+                    <input type="text" disabled id="ws" >
+                    <label for="ws">Weapon Skill (WS)</label>
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="bs" >
+                    <label for="bs">Ballistic Skill (BS)</label>
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="tn" >
+                    <label for="tn"> Toughness (Tn)</label>
+                </div>
+                <div class="coin">
+                    <label for="credits">Credits: </label>
+                    <input type="text" id="credits" >
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="str" >
+                    <label for="str">Strength (Str)</label>
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="dex" >
+                    <label for="dex">Dexterity (Dex)</label>
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="int" >
+                    <label for="int">Intelligence (INT)</label>
+                </div>
+                <div class="coin">
+                    <label for="doch">Doch: </label>
+                    <input type="text" id="doch" >
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="per" >
+                    <label for="per">Perception (PER)</label>
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="wp" >
+                    <label for="wp">Willpower (WP)</label>
+                </div>
+                <div class="stat">
+                    <input type="text" disabled id="fel" >
+                    <label for="fel"> Fellowship (FEL)</label>
+                </div>
+                <div class="coin">
+                    <label for="renown">Renown: </label>
+                    <input type="text" id="renown" >
+                </div>
+            </div>
+            <div id="check-boxs">
+                <span class="title" style="grid-column: 1/ span 4;">Health and Equipment</span>
+                <div class="check-boxs-container" id="wounds">
+                    <span>Wounds</span>
+                    <div class="check-boxs">
+                    </div>
+                </div>
+                <div class="check-boxs-container" id="stamina">
+                    <span>Stamina</span>
+                    <div class="check-boxs">
+                    </div>
+                </div>
+            </div>
+            <button id="add-check-box">Add box</button>
+            <div>
+                <button id="save-btn">save</button>
+                <button id="load-btn">Load</button>
+                <input id="load-file" type="file" accept="application/json" style="display:none" />
+            </div>
+        </div>
+            
+        <div id="right-side">
+            <div class="tabgrub">
+                <button id="actionsTab" class="active">Actions</button>
+                <button id="traitsTab">Traits</button>
+                <button id="inventoryTab">Inventory</button>
+                <button id="statusEffectsTab">Status Effects</button>
+                <button id="notesTab">Notes</button>
+            </div>
+            <div id="Actions" class="active">
+                <div class="sections">
+                    <h3>Actions</h3>
+                    <div id="actions-container" class="textarea-containers">
+                        <p class="organic">Recover [1 stamina + Blank Check of 3 dice]</p>
+                    </div>
+                    <button id="add-action-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Bonus Actions</h3>
+                    <div id="bonus-actions-container" class="textarea-containers">
+                        <p class="organic">Breathe [Recover 1 stamina]</p>
+                        <p class="mech"> Overclock [(Must be done before a full action) Select a full action to do and double its stamina cost in return for doubling numbers rolled (Snake Eyes not included)]</p>
+                    </div>
+                    <button id="add-bonus-action-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Other</h3>
+                    <div id="other-container" class="textarea-containers">
+                        <input type="text" id="background" disabled>
+                    </div>
+                    <button id="add-other-button">add text</button>
+                </div>
+            </div>
+            <div id="Traits" class="Traits">
+                <div class="sections">
+                    <h3>Traits</h3>
+                    <div id="traits-container" class="textarea-containers">
+                    </div>
+                    <button id="add-trait-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Resistances</h3>
+                    <div id="resistances-container">
+                        <p class="organic">ED</p>
+                        <p class="mech">Cold, Laceration, Piercing, Flash</p>
+                    </div>
+                    <button id="add-resistences-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Immunities</h3>
+                    <div id="immunities-container">
+                        <p class="mech">Immunity to Poison, Plague, Gas</p>
+                    </div>
+                    <button id="add-immunities-button">add text</button>
+                </div>
+                <div class="sections">
+                    <h3>Weaknesses</h3>
+                    <div id="weaknesses-container">
+                        <p class="mech"> Arc, ED</p>
+                    </div>
+                    <button id="add-weaknesses-button">add text</button>
+                </div>
+            </div>
+            <div id="Inventory" class="Inventory">
+                <div class="sections">
+                    <h3>Inventory</h3>
+                    <div id="inventory-container" class="textarea-containers">
+                    </div>
+                    <button id="add-inventory-button">add text</button>
+                </div>
+            </div>
+            <div id="StatusEffects" class="StatusEffects">
+                <div class="sections">
+                    <h3>Status Effects</h3>
+                    <div id="status-effects-container" class="textarea-containers"></div>
+                    <button id="add-status-effects-button">add text</button>
+                </div>
+            </div>
+            <div id="Notes" class="Notes">
+                <div class="sections">
+                    <h3>Notes</h3>
+                    <div id="notes-container" class="textarea-containers"></div>
+                    <button id="add-notes-button">add text</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="overly">
+        <div class="edit-character-box" id="top">
+            <h2>Edit Character</h2>
+            <img id="pfp-viewer" src="pfp.png" alt="Profile preview" style="max-width: 160px; border-radius: 8px;" />
+            <button id="pfp-btn" title="Change picture">Change Picture</button>
+            <label for="chn-edit">Character Name:<input type="text" id="chn-edit" placeholder="Character name her" style="width: 250px;" maxlength="31"></label>
+            <label for="gender-edit">Gender:
+                <select id="gender-edit" style="width: 90px;">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                </select>
+            </label>
+            <label for="race-edit"> Race:
+                <select id="race-edit">
+                    <option value="Solerites" data-organic="true" 
+                        title="Crystalline-cored beings whose core vibrates at a fiery frequency, requiring EVA suits.">
+                        Solerites
+                    </option>
+                    <option value="Sludge" data-organic="true" 
+                        title="Ameboid slime-like beings requiring EVA suits; they can mold their bodies but struggle in harsh environments.">
+                        Sludge
+                    </option>
+                    <option value="Ratfolk" data-organic="true" 
+                        title="Rodent-evolved, small and nimble, excelling in stealth, quick thinking, and adaptability.">
+                        Ratfolk
+                    </option>
+                    <option value="Chekari" data-organic="true" 
+                        title="Isopod-like beings with exoskeletons and multiple limbs, resilient and effective in combat.">
+                        Chekari
+                    </option>
+                    <option value="Humbeak" data-organic="true" 
+                        title="Beak-faced beings who communicate through humming and vibrations; reclusive but deeply emotional.">
+                        Humbeak
+                    </option>
+                    <option value="Machines" data-organic="false" 
+                        title="Sentient machines with advanced tech and intellect, varying in form but lacking biological needs.">
+                        Machines
+                    </option>
+                    <option value="Florals" data-organic="true" 
+                        title="Plant-based humanoids connected to nature, able to heal, grow, and adapt in harmony.">
+                        Florals
+                    </option>
+                    <option value="Squib" data-organic="true" 
+                        title="Cephalopod-based aliens, intelligent and dexterous, skilled in manipulation and underwater environments.">
+                        Squib
+                    </option>
+                    <option value="Mothkin" data-organic="true" 
+                        title="Insectoid race with large wings, agile and excellent in low-light sensory conditions.">
+                        Mothkin
+                    </option>
+                    <option value="Terran" data-organic="true" 
+                        title="Humans: versatile, resilient, ambitious explorers with diverse subraces adapted to different worlds.">
+                        Terran
+                    </option>
+                    <option value="Shlenki" data-organic="true" 
+                        title="Reptilian humanoids with vast genetic variation; survivors with adaptability, intelligence, and resourcefulness.">
+                        Shlenki
+                    </option>
+                    <option value="Excavator" data-organic="false" 
+                        title="Quadrupedal beings fused with machinery; efficient, divided between conquest and cooperation.">
+                        Excavator
+                    </option>
+                    <option value="Greenskins" data-organic="true" 
+                        title="Small, gray-green beings with vast knowledge vaults; insatiable curiosity and technological advancement.">
+                        Greenskins
+                    </option>
+                    <option value="Rift Beasts" data-organic="true" 
+                        title="Warrior species co-evolved, harboring hatred for Terrans due to long-standing sector wars.">
+                        Rift Beasts
+                    </option>
+                    <option value="Featherfolk" data-organic="true" 
+                        title="Bird-like humanoids, peaceful communicators and scouts, though physically fragile.">
+                        Featherfolk
+                    </option>
+                    <option value="Architex" data-organic="true" 
+                        title="Hive-driven insectoids with syrup-like energy tails; unity-focused civilization with status tied to tail size.">
+                        Architex
+                    </option>
+                    <option value="Skits" data-organic="true" 
+                        title="Small humanoid cats, genetically altered by Terrans; agile, stealthy, and often arrogant.">
+                        Skits
+                    </option>
+                    <option value="Zelxi" data-organic="true" 
+                        title="Religious, battle-focused race believing in living on through memory; valorized for sacrifice.">
+                        Zelxi
+                    </option>
+                    <option value="Wingmolts" data-organic="true" 
+                        title="Four-winged beings without legs, using tails for movement; biomechanical tech, rare but welcoming.">
+                        Wingmolts
+                    </option>
+                    <option value="Shailrok" data-organic="true" 
+                        title="Insectoid race from Drogan Prime; gravity-adapted tunnel dwellers with sacred digging traditions.">
+                        Shailrok
+                    </option>
+                    <option value="Mechadenrum bio" data-organic="true" 
+                        title="Cybernetically enhanced Terrans who formed their own society, valuing mechanical supremacy.">
+                        Mechadenrum bio
+                    </option>
+                    <option value="Mechadenrum mech" data-organic="false" 
+                        title="Cybernetically enhanced Terrans who formed their own society, valuing mechanical supremacy.">
+                        Mechadenrum mech
+                    </option>
+                    <option value="Scullslug" data-organic="true" 
+                        title="Small bipedal gastropods with mitten-like hands; respected as 'little heroes' among races.">
+                        Scullslug
+                    </option>
+                </select>
+            </label>
+            <label for="speed-edit">Speed (in tiles):<input type="number" id="speed-edit" value="5"></label>
+        <label for="class-edit"> Class:
+            <select id="class-edit">
+                <option value="Gunslinger" title="Masters of ranged combat, excelling at precision, quick-draws, and critical hits.">Gunslinger</option>
+                <option value="Mechanic" title="Inventors who deploy gadgets, drones, turrets, and repair equipment; resourceful in combat and exploration.">Mechanic</option>
+                <option value="Medic" title="Battlefield lifesavers using healing tech, injectors, and surgical tools to keep allies alive.">Medic</option>
+                <option value="Technomancer" title="Fuse science with magic-like abilities, manipulating energy fields and electronics for offense or defense.">Technomancer</option>
+                <option value="Exosuiter" title="Masters of exosuits, mechs, and vehicles; versatile pilots with strength and adaptability.">Exosuiter</option>
+                <option value="Envoy" title="Charismatic leaders and negotiators who inspire allies and manipulate social outcomes.">Envoy</option>
+                <option value="Starseeker" title="Explorers and pioneers venturing into uncharted territory, uncovering secrets and cosmic mysteries.">Starseeker</option>
+                <option value="Vanguard" title="Frontline protectors with heavy armor and melee skills, inspiring courage and controlling the battlefield.">Vanguard</option>
+                <option value="Marksmen" title="Precision shooters specializing in long-range combat and eliminating key targets with deadly accuracy.">Marksmen</option>
+                <option value="Chemist" title="Masters of chemistry and alchemy, crafting concoctions to heal, enhance, or devastate enemies.">Chemist</option>
+                <option value="Beast Master" title="Tame wild creatures to fight alongside loyal companions, using versatile combat strategies.">Beast Master</option>
+                <option value="Operative" title="Stealthy infiltrators skilled in sabotage, intelligence gathering, and precision strikes.">Operative</option>
+                <option value="Mercenary" title="Adaptable warriors thriving in chaos, combining brute force and cunning for survival and profit.">Mercenary</option>
+            </select>
+        </label>
+        <label for="background-edit">background-edit: 
+            <select id="background-edit">
+                <option value="Pilot" title="Masters of starship operations, navigating asteroid fields, dogfights, and daring landings.">Pilot</option>
+                <option value="Engineer" title="Problem solvers who construct, repair, and improve technology; ingenious in battle and exploration.">Engineer</option>
+                <option value="Colonist" title="Resilient survivors from frontier worlds, resourceful and community-driven under harsh conditions.">Colonist</option>
+                <option value="Corporate Defector" title="Ex-employees of megacorporations, skilled in tech and driven to undermine corruption.">Corporate Defector</option>
+                <option value="Bounty Hunter" title="Ruthless trackers and combat specialists, thriving in high-stakes situations with unrelenting focus.">Bounty Hunter</option>
+                <option value="Frontier Scientist" title="Pioneers of knowledge, experts in alien biology, physics, or archaeology, vital in exploration.">Frontier Scientist</option>
+                <option value="Exiled Noble" title="Stripped of privilege but cunning, leveraging education and charisma to survive and lead.">Exiled Noble</option>
+                <option value="Prison Breaker" title="Masters of survival and improvisation, hardened by confinement and skilled at turning odds.">Prison Breaker</option>
+                <option value="Scavenger" title="Experts at salvaging valuable items from wreckage, resourceful and sharp-eyed treasure seekers.">Scavenger</option>
+                <option value="Starport Rat" title="Quick and clever survivors of bustling trade hubs, adept at navigating urban chaos.">Starport Rat</option>
+            </select>
+        </label>
+        <label for="status">Status:<select id="status">
+            <option value="Wealthy">Wealthy</option>
+            <option value="Middle">Middle</option>
+            <option value="Poor">Poor</option>
+            <option value="Destitute">Destitute</option>
+        </select></label>
+        <label for="level-change">Level:<input type="number" id="level-change" value="1" min="1"></label>
+        </div>
+        <div class="edit-character-box" id="mid">
+            <h3>Stats</h3>
+                        <!-- Stats -->
+                <div class="stat-edit">
+                <input type="number" id="ws" value="1" min="1">
+                <label for="ws">Weapon Skill (WS)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="bs" value="1" min="1">
+                <label for="bs">Ballistic Skill (BS)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="tn" value="1" min="1">
+                <label for="tn">Toughness (Tn)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="str" value="1" min="1">
+                <label for="str">Strength (Str)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="dex" value="1" min="1">
+                <label for="dex">Dexterity (Dex)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="int" value="1" min="1">
+                <label for="int">Intelligence (INT)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="per" value="1" min="1">
+                <label for="per">Perception (PER)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="wp" value="1" min="1">
+                <label for="wp">Willpower (WP)</label>
+                </div>
+                <div class="stat-edit">
+                <input type="number" id="fel" value="1" min="1">
+                <label for="fel">Fellowship (FEL)</label>
+                </div>
+                <div style="display: flex; flex-direction: column; grid-column: 1 /3 ;">
+                <label for="points-remaining">Points Remaining:<input type="text" id="points-remaining"value="9" disabled></label>
+                <label for="Exstra-points">Exstra points:<input type="number" id="Exstra-points"></label>
+                </div>
+        </div>
+        <div class="edit-character-box" id="bottom">
+            <h3>Wounds and Stamina</h3>
+            <label for="wounds-mod">Wounds Modifier:<input type="number" value="2" maxlength="2" id="wounds-mod" style=" text-align: center;"></label>
+            <label for="stamina-mod">Stamina Modifier:<input type="number" value="1" maxlength="2" id="stamina-mod" style=" text-align: center;"></label>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 Jack Knife. Hyper and Bird</p>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>

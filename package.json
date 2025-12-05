@@ -1,25 +1,27 @@
 {
-  "name": "fullsatck-webapp",
+  "name": "full-stack-webapp",
   "version": "1.0.0",
-  "description": "A web-based character sheet for the Jack Knife sci-fi tabletop RPG. It's mad so that those that are intrested in jack knife or just want to try it out for them selves",
-  "main": "index.js",
+  "description": "",
+  "main": "sever.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "app": "npx nodemon server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hyperit123/Fullsatck-webapp.git"
+    "url": "git+https://github.com/hyperit123/Full-stack-webapp.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/hyperit123/Fullsatck-webapp/issues"
+    "url": "https://github.com/hyperit123/Full-stack-webapp/issues"
   },
-  "homepage": "https://github.com/hyperit123/Fullsatck-webapp#readme",
+  "homepage": "https://github.com/hyperit123/Full-stack-webapp#readme",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "npx": "^10.2.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
