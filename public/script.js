@@ -1,3 +1,223 @@
+// Auto-load character data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.pathname.endsWith('charactersheet.html')) {
+        loadCharacterSheet();
+    }
+});
+// --- Character Sheet Save/Load ---
+async function saveCharacterSheet() {
+    // Collect all relevant fields in the same structure as the JSON loader expects
+    const data = {};
+    // Basic info
+    data.name = document.getElementById('chn').value;
+    data.gender = document.getElementById('gender').value;
+    data.race = document.getElementById('race').value;
+    data.class = document.getElementById('class').value;
+    data.background = document.getElementById('background') ? document.getElementById('background').value : '';
+    data.level = document.getElementById('level-value').value || document.getElementById('level-change')?.value || 1;
+    data.exstrapoints = document.getElementById('Exstra-points')?.value || 0;
+    data.speed = document.getElementById('speed').value || document.getElementById('speed-edit')?.value || 5;
+    // Coins
+    data.coins = {
+        credits: document.getElementById('credits')?.value || '',
+        doch: document.getElementById('doch')?.value || '',
+        renown: document.getElementById('renown')?.value || ''
+    };
+    // Status
+    data.status = document.getElementById('status')?.value || '';
+    // Stats
+    data.stats = {};
+    ['ws','bs','str','tn','dex','per','int','wp','fel'].forEach(stat => {
+        data.stats[stat] = document.querySelector('.stat-edit #'+stat)?.value || document.querySelector('.stat #'+stat)?.value || '';
+    });
+    // Wounds/Stamina modifiers
+    data.woundsMod = document.getElementById('wounds-mod')?.value || '';
+    data.staminaMod = document.getElementById('stamina-mod')?.value || '';
+    // Wounds/Stamina checked state and count (for added checkboxes)
+    const woundsBoxes = document.getElementById('wounds').getElementsByClassName('check-boxs')[0].querySelectorAll('input[type="checkbox"]');
+    data.woundsChecked = Array.from(woundsBoxes).map(cb => cb.checked);
+    data.woundsCount = woundsBoxes.length;
+    const staminaBoxes = document.getElementById('stamina').getElementsByClassName('check-boxs')[0].querySelectorAll('input[type="checkbox"]');
+    data.staminaChecked = Array.from(staminaBoxes).map(cb => cb.checked);
+    data.staminaCount = staminaBoxes.length;
+    // Dynamic textboxes
+    data.textboxes = {};
+    document.querySelectorAll('.text-box').forEach(tb => {
+        data.textboxes[tb.id] = {
+            value: tb.value,
+            rows: tb.rows,
+            cols: tb.cols,
+            styleWidth: tb.style.width,
+            styleHeight: tb.style.height
+        };
+    });
+    // Profile picture: always save as data URL, even for default
+    const pfpImg = document.getElementById('pfp');
+    if (pfpImg) {
+        let done = false;
+        if (pfpImg.dataset.pfpDataUrl) {
+            data.pfpDataUrl = pfpImg.dataset.pfpDataUrl;
+            done = true;
+        } else if (pfpImg.src && pfpImg.src.startsWith('data:')) {
+            data.pfpDataUrl = pfpImg.src;
+            done = true;
+        }
+        if (!done) {
+            // Convert the current image (even default) to a data URL
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = pfpImg;
+                canvas.width = img.naturalWidth || 84;
+                canvas.height = img.naturalHeight || 84;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                data.pfpDataUrl = canvas.toDataURL('image/png');
+            } catch (e) {
+                data.pfpDataUrl = null;
+            }
+        }
+    }
+    // Extra checkboxes (save checked state, always save number, label, checked)
+    data.extraCheckboxes = [];
+    document.querySelectorAll(".check-boxs-container").forEach(container => {
+        if (container.id === 'wounds' || container.id === 'stamina') return;
+        let numInput = container.querySelector(".inputval");
+        let labelInput = container.querySelector(".check-box-exstras");
+        let num = numInput ? parseInt(numInput.value) : 1;
+        let label = labelInput ? labelInput.value : '';
+        let checked = Array.from(container.querySelectorAll('input[type=\"checkbox\"]')).map(cb => cb.checked);
+        data.extraCheckboxes.push({number: num, text: label, checked});
+    });
+    // Mark that a save has occurred and overlay should be closed on next load
+    data.closeOverlayOnLoad = true;
+    try {
+        const res = await fetch('/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data })
+        });
+        const result = await res.json();
+        if (result.success) {
+            alert('Character saved!');
+        } else {
+            alert('Save failed');
+        }
+    } catch (err) {
+        alert('Error saving character');
+    }
+}
+
+async function loadCharacterSheet() {
+    try {
+        const res = await fetch('/data');
+        if (!res.ok) throw new Error('Not logged in or error loading');
+        const result = await res.json();
+        const data = result.data || {};
+        // Use the same loader as the JSON import for full UI restoration
+        // Restore wounds/stamina box count before loading data
+        if (typeof data.woundsCount === 'number') {
+            let woundsContainer = document.getElementById('wounds').getElementsByClassName('check-boxs')[0];
+            woundsContainer.innerHTML = '';
+            for (let i = 0; i < data.woundsCount; i++) {
+                let checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                woundsContainer.appendChild(checkbox);
+            }
+        }
+        if (typeof data.staminaCount === 'number') {
+            let staminaContainer = document.getElementById('stamina').getElementsByClassName('check-boxs')[0];
+            staminaContainer.innerHTML = '';
+            for (let i = 0; i < data.staminaCount; i++) {
+                let checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                staminaContainer.appendChild(checkbox);
+            }
+        }
+        // Restore extra checkboxes (user-added groups)
+        if (Array.isArray(data.extraCheckboxes)) {
+            let checkboxs = document.getElementById('check-boxs');
+            // Remove all user-added groups except wounds/stamina
+            Array.from(checkboxs.querySelectorAll('.check-boxs-container')).forEach(container => {
+                if (container.id !== 'wounds' && container.id !== 'stamina') container.remove();
+            });
+            data.extraCheckboxes.forEach((group, idx) => {
+                // Container for each group
+                let chbc = document.createElement('div');
+                chbc.className = "check-boxs-container";
+                chbc.style = 'display: grid; grid-template-columns: 60% 20%; gap: 10px;';
+                checkboxs.appendChild(chbc);
+
+                // Label input
+                let inputforchc = document.createElement('input');
+                inputforchc.placeholder = `check box ${idx+1}`;
+                inputforchc.className = 'check-box-exstras';
+                inputforchc.value = group.text;
+                chbc.appendChild(inputforchc);
+
+                // Number input
+                let inputval = document.createElement('input');
+                inputval.type = 'number';
+                inputval.value = group.number;
+                inputval.min = 1;
+                inputval.max = 40;
+                inputval.className = 'inputval';
+                chbc.appendChild(inputval);
+
+                // Div to hold the checkboxes
+                let div = document.createElement('div');
+                div.className = 'check-boxs';
+                chbc.appendChild(div);
+
+                // Add checkboxes and set checked state
+                function renderCheckboxes(checkedArr) {
+                    div.innerHTML = '';
+                    let count = checkedArr ? checkedArr.length : (parseInt(inputval.value) || 1);
+                    for (let i = 0; i < count; i++) {
+                        let checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = checkedArr ? !!checkedArr[i] : false;
+                        div.appendChild(checkbox);
+                    }
+                }
+                // Initial render with loaded checked state
+                renderCheckboxes(group.checked);
+
+                // Delete button for this group
+                let delBtn = document.createElement('button');
+                delBtn.textContent = 'Delete';
+                delBtn.className = 'delete-btn';
+                delBtn.style.gridColumn = 'span 2';
+                delBtn.style.height = '30px';
+                delBtn.style.width = '70px';
+                delBtn.addEventListener('click', () => {
+                    chbc.remove();
+                });
+                chbc.appendChild(delBtn);
+
+                // Function to update checkboxes based on inputval, preserving checked state if possible
+                function updateexstra() {
+                    let val = parseInt(inputval.value) || 1;
+                    let prevChecked = Array.from(div.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
+                    div.innerHTML = '';
+                    for (let i = 0; i < val; i++) {
+                        let checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = prevChecked[i] || false;
+                        div.appendChild(checkbox);
+                    }
+                }
+                inputval.addEventListener('input', updateexstra);
+            });
+        }
+        loadCharacterData(data);
+        safeCall(pagereload);
+    } catch (err) {
+        alert('Error loading character');
+    }
+}
+
+document.getElementById('save-btn').addEventListener('click', saveCharacterSheet);
+document.getElementById('load-btn').addEventListener('click', loadCharacterSheet);
 // JavaScript Document
 
 // Wounds input logic and checkbox generation
@@ -568,18 +788,16 @@ function getCharacterData() {
         };
     });
 
-    // Extra checkboxes (save checked state)
+    // Extra checkboxes (save checked state, always save number, label, checked)
     data.extraCheckboxes = [];
     document.querySelectorAll(".check-boxs-container").forEach(container => {
         if (container.id === 'wounds' || container.id === 'stamina') return;
         let numInput = container.querySelector(".inputval");
         let labelInput = container.querySelector(".check-box-exstras");
-        let num = numInput ? numInput.value : null;
-        let label = labelInput ? labelInput.value : null;
+        let num = numInput ? parseInt(numInput.value) : 1;
+        let label = labelInput ? labelInput.value : '';
         let checked = Array.from(container.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
-        if (num !== null && label !== null && num !== "" && label !== "") {
-            data.extraCheckboxes.push({number: num, text: label, checked});
-        }
+        data.extraCheckboxes.push({number: num, text: label, checked});
     });
 
     // Profile picture (save as data URL if available)
@@ -596,28 +814,7 @@ function getCharacterData() {
 
 // Save button logic
 
-document.getElementById("save-btn").addEventListener("click", () => {
-    let snapshot = getCharacterData();
-    console.log(snapshot); // Inspect in console
-
-    // Convert snapshot to JSON string
-    const dataStr = JSON.stringify(snapshot, null, 2);
-
-    // Create a Blob from the JSON string
-    const blob = new Blob([dataStr], { type: "application/json" });
-
-    // Create a temporary download link
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "characterData.json"; // File name
-    document.body.appendChild(a);
-    a.click();
-
-    // Clean up
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-});
+// Removed JSON file download logic. Saving is now only to the database via saveCharacterSheet().
 
 
 // --- Status Effects Viewer Logic ---
@@ -738,6 +935,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 function loadCharacterData(data) {
+        // If requested, close the overlay after loading
+        if (data.closeOverlayOnLoad) {
+            const overly = document.getElementById('overly');
+            if (overly) overly.style.display = 'none';
+            // Reset flag so it doesn't close every time
+            data.closeOverlayOnLoad = false;
+        }
     // Basic info
     const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? el.value; };
     setVal("chn", data.name || "");
@@ -924,23 +1128,24 @@ function loadCharacterData(data) {
                 });
                 chbc.appendChild(delBtn);
 
-                function updateexstra() {
-                    const desired = parseInt(inputval.value) || 0;
-                    div.innerHTML = "";
-                    for (let i = 0; i < desired; i++) {
-                        const checkbox = document.createElement("input");
-                        checkbox.type = "checkbox";
+                function renderCheckboxes(checkedArr) {
+                    div.innerHTML = '';
+                    let count = parseInt(inputval.value) || 1;
+                    for (let i = 0; i < count; i++) {
+                        let checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = checkedArr ? !!checkedArr[i] : false;
                         div.appendChild(checkbox);
                     }
-                    // Restore checked state if available
-                    if (Array.isArray(checked)) {
-                        div.querySelectorAll('input[type="checkbox"]').forEach((cb, idx) => {
-                            cb.checked = !!checked[idx];
-                        });
-                    }
                 }
-                updateexstra();
-                inputval.addEventListener("input", updateexstra);
+                // Initial render with loaded checked state
+                renderCheckboxes(checked);
+
+                // When number changes, preserve checked state as much as possible
+                inputval.addEventListener('input', () => {
+                    let prevChecked = Array.from(div.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
+                    renderCheckboxes(prevChecked);
+                });
             });
         }
     }
@@ -952,7 +1157,7 @@ function countCheckedCheckboxes(container) {
     // Ensure tabs are consistent after load
     safeCall(() => updateTabs('Actions'));
 
-    // Restore profile picture
+    // Restore profile picture from data URL if present
     const pfpImg = document.getElementById('pfp');
     if (pfpImg) {
         if (data.pfpDataUrl) {
@@ -961,6 +1166,8 @@ function countCheckedCheckboxes(container) {
         } else if (data.pfpSrc) {
             pfpImg.src = data.pfpSrc;
             delete pfpImg.dataset.pfpDataUrl;
+        } else {
+            // fallback: do not change src
         }
         const pfpViewer = document.getElementById('pfp-viewer');
         if (pfpViewer) {
