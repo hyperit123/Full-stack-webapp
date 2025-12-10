@@ -145,6 +145,7 @@ header{
     width: 40px;
     border-radius: 4px;
     font-size: xx-large;
+    margin-left: auto;
 }
 #edit-btn:hover{
     background-color: var(--active);

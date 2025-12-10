@@ -625,7 +625,6 @@ levelInput.addEventListener("input", calculatePoints);
 calculatePoints();
 
 
-// level changing
 let currentlevel = document.getElementById('level-change')
 let levelvalue = document.getElementById('level-value')
 currentlevel.addEventListener("input", () => {
@@ -1240,3 +1239,79 @@ function countCheckedCheckboxes(container) {
         });
     }
 })();
+
+// Check who is logged in and display it on the page
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/whoami')
+        .then(res => res.json())
+        .then(data => {
+            if (data.username) {
+                // Show username somewhere on the page
+                document.body.insertAdjacentHTML('afterbegin', `<div id="user-info">Logged in as: ${data.username}</div>`);
+            } else {
+                // Optionally redirect to login page
+                window.location.href = '/Index.html';
+            }
+        })
+        .catch(() => {
+            window.location.href = '/Index.html';
+        });
+});
+
+// Update redirection to Index.html instead of login.html
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/whoami')
+        .then(res => res.json())
+        .then(data => {
+            if (data.username) {
+                // Wrap user info and options in a styled div with name at the top and options below
+                const statusEffectsHeader = document.querySelector('.status-effects-header-viewer');
+                if (statusEffectsHeader) {
+                    statusEffectsHeader.insertAdjacentHTML('afterend', `
+                        <div id="user-info" style="background-color: var(--background); padding: 10px; border-radius: 8px; margin-left: 10px;">
+                            <div style="font-weight: bold; margin-bottom: 5px;">Logged in as: ${data.username}</div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <button id="logout-btn" style="padding: 5px; border-radius: 4px; background-color: var(--active); color: var(--accent-color); border: none;">Logout</button>
+                                <button id="change-password-btn" style="padding: 5px; border-radius: 4px; background-color: var(--active); color: var(--accent-color); border: none;">Change Password</button>
+                            </div>
+                        </div>
+                    `);
+
+                    // Add logout functionality
+                    document.getElementById('logout-btn').addEventListener('click', () => {
+                        fetch('/logout', { method: 'POST' })
+                            .then(() => window.location.href = '/Index.html');
+                    });
+
+                    // Add password change functionality
+                    document.getElementById('change-password-btn').addEventListener('click', () => {
+                        const newPassword = prompt('Enter your new password:');
+                        if (newPassword) {
+                            fetch('/change-password', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ password: newPassword })
+                            }).then(res => {
+                                if (res.ok) {
+                                    alert('Password changed successfully!');
+                                } else {
+                                    alert('Failed to change password.');
+                                }
+                            });
+                        }
+                    });
+                }
+
+                // Hide the user info at the top if it exists
+                const topUserInfo = document.getElementById('user-info');
+                if (topUserInfo) {
+                    topUserInfo.style.display = 'none';
+                }
+            } else {
+                window.location.href = '/Index.html';
+            }
+        })
+        .catch(() => {
+            window.location.href = '/Index.html';
+        });
+});
