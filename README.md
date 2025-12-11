@@ -1,4 +1,4 @@
-# Fullsatck webapp 
+# Full stack webapp 
 ## Jack Knife - Digital Character Sheet
 A web-based character sheet for the Jack Knife sci-fi tabletop RPG. It's mad so that those that are intrested in jack knife or just want to try it out for them selves
 
