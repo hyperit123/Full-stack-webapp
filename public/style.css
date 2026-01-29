@@ -1,33 +1,3 @@
-/* Status Effects Viewer in header */
-.status-effects-header-viewer {
-    background: var(--secondery);
-    border-radius: 8px;
-    margin-left: 10px;
-    max-height: 70px;
-    min-width: 120px;
-    max-width: 200px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 6px 10px;
-    font-size: small;
-    color: var(--accent-color);
-    background-color: var(--background);
-}
-.status-effects-header-title {
-    font-weight: bold;
-    margin-bottom: 4px;
-    width: 100%;
-    text-align: left;
-}
-#status-effects-header-list {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
 /*color pallete for the website*/
 :root{
     --background: #161616;
@@ -35,14 +5,24 @@
     --active: #616161;
     --accent-color:#ffffff;
 }
+/* Standardize box-sizing */
+*{
+    box-sizing: border-box;
+}
 /*this makes the base color of the page navi blue*/
 body{
-    background-color: var(--background);
+    background: var(--background); /* Sets the background image */
+    background-size: cover;  /* Scales the image to cover the entire viewport */
+    background-repeat: no-repeat;  /* Prevents tiling */
+    background-position: center;  /* Centers the image */
     display: flex;
     flex-direction: column;
     gap: 10px;
     color: var(--accent-color);
     font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    z-index: -1;
 }
 /* this maks the header fill the page with and to make the items align too the right in a line with some space betwin them*/
 header{
@@ -52,22 +32,28 @@ header{
     flex-direction: row;
     gap: 5px;
     border-radius: 8px;
+
+}
+#top-bar{
+    grid-row:1 /span 2;
+    grid-column: 1;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    background-color: #44444456;
+    padding: 5px;
+    border-radius: 8px;
 }
 /* makes the pfp loade a defult picture and makes it pixelated so that you can see the art I made :)*/
-#pfp{
-    image-rendering: pixelated; 
-    border-radius: 100%;
-    height: 84px;
-    width: 84px;
-    border: 3px solid var(--background);
-}
 /* Match the viewer to the main profile image */
-#pfp-viewer {
+#pfp, #pfp-viewer {
     image-rendering: pixelated;
     border-radius: 100%;
     height: 84px;
     width: 84px;
     border: 3px solid var(--background);
+}
+#pfp-viewer {
     display: block;
     margin-bottom: 8px;
     margin-left: auto;
@@ -106,23 +92,26 @@ header{
 #class{width: fit-content;}
 #gender, #race, #class{
     color: var(--accent-color); background-color: var(--background); border: none; border-radius: 2px;
+    padding: 1px 4px 1px 1px;
 }
-#chn{
-    width: 99%;
+#chn, #status-display{
+    width: 100%;
     background-color: var(--background);
     color: var(--accent-color);
     border: none;
 }
-#level,
-#level-change{
+#level{
     font-size: small;
     display: flex;
     flex-direction: row;
-    width: 35px;
+    width: 45px;
     height: 20px;
 }
 #level-change{
     border: 2px solid var(--accent-color);
+    font-size: small;
+    width: 35px;
+    height: 20px;
 }
 #level-value{
     width: 15px;
@@ -177,38 +166,44 @@ footer p{
     color: var(--accent-color);
     text-align: center;
     margin-top: 20px;
+    font-size: large;
     font-family: Arial, Helvetica, sans-serif;
 }
 /*makes the main content div a flex box with row direction so that the left and right side divs are next to each other*/
 #main-content{
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-rows: auto auto;
     gap: 5px;
     width: 100%;
     position: relative;
+    z-index: 0;
+}
+#center{
+    display: flex;
+    flex-direction: row;
+    gap: 0.3%;
 }
 /*makes the left side div have the secondery color as its background*/
-#left-side{
+#left-side, #right-side{
     background-color: var(--secondery);
     padding: 0.4%;
     border-radius: 8px;
-    width: 25%;
-    height: fit-content;
+    height: 750px;
+    overflow-y: scroll;
+    border: 4px solid rgba(0, 0, 0, 0.39);
+}
+#left-side{
     display: flex;
     flex-direction: column;
     gap: 5px;
+    z-index: 0;
+    width: 25.4%;
 }
 #right-side{
-    background-color: var(--secondery);
-    padding: 0.4%;
-    border-radius: 8px;
-    width: 73.8%;
-    height: 100%;
-    position: absolute;
+    position: sticky;
     right: 0;
     top: 0;
-    overflow-y: auto;
-    box-sizing: border-box;
+    width: 73.8%;
 }
 .title{
     font-size: xx-large;
@@ -234,7 +229,11 @@ footer p{
     padding: 6px 2px;
     border-radius: 6px;
 }
-#str, #dex, #ws, #bs, #tn, #int, #per, #wp, #fel{
+#str-display, #dex-display, #ws-display,
+#bs-display, #tn-display, #int-display,
+#per-display, #wp-display, #fel-display,
+#str, #dex, #ws, #bs,
+#tn, #int, #per, #wp, #fel {
     height: 50px;
     width: 50px;
     border: none;
@@ -312,18 +311,31 @@ label{
     grid-template-columns: auto auto auto auto auto auto auto auto auto auto auto;
     gap: 1px;
 }
-.check-boxs input[type="checkbox"]{
+.check-boxs input[type="checkbox"] {
     width: 22px;
     height: 22px;
     appearance: none;
     border: 2px solid var(--active);
     border-radius: 4px;
     background-color: var(--background);
+    position: relative;  /* Required for pseudo-element positioning */
 }
-.check-boxs input[type="checkbox"]:checked{
-    background-color: var(--accent-color);
+
+.check-boxs input[type="checkbox"]:checked {
+    background-color: var(--accent-color);  /* Change to gray for better contrast */
 }
-.check-boxs-container input[type="text"]{
+
+.check-boxs input[type="checkbox"]:checked::after {
+    color: var(--accent-color);  /* White checkmark */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 16px;
+    font-weight: bold;
+}
+.check-boxs-container input[type="text"],
+.check-boxs-container input[type="number"] {
     width: 22px;
     height: 25px;
     font-size: large;
@@ -331,6 +343,14 @@ label{
     background-color: var(--background);
     border: 2px solid var(--active);
     border-radius: 4px;
+    text-align: center;
+}
+.check-boxs-container .tracker-name {
+    width: 230px;
+    text-align: left;
+}
+.check-boxs-container .tracker-max {
+    width: 50px;
     text-align: center;
 }
 .tabgrub{
@@ -379,6 +399,18 @@ label{
     border-style: solid;
     border-image: url(pressed.png) 30 round;
 }
+#statsTab {
+    display: none;
+}
+#statsTab.active {
+    background-color: #333333;
+    border-width: 10px;
+    border-style: solid;
+    border-image: url(pressed.png) 30 round;
+}
+#statsTab:hover {
+    background: #4d4c4c;
+}
 #actionsTab:hover,
 #traitsTab:hover,
 #inventoryTab:hover,
@@ -390,13 +422,10 @@ label{
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-height: 25px;
     margin-bottom: 10px;
 }
-.text-box {
-    width: 15%;
-    height: 1%;
-    max-width: 1100px;
-    max-height: 1000px;
+textarea, .text-box {
     background-color: var(--background);
     color: var(--accent-color);
     border: 2px solid var(--active);
@@ -404,6 +433,13 @@ label{
     font-size: large;
     font-family: Arial, Helvetica, sans-serif;
     padding: 5px;
+    resize: both;
+}
+.text-box {
+    width: 15%;
+    height: 1%;
+    max-width: 1100px;
+    max-height: 1000px;
 }
 
 #overly{ 
@@ -413,7 +449,7 @@ label{
     width: 100%;
     height: 100%;
     background: rgba(0,0,0,0.5);
-    display: flex;
+    display: none;
     justify-content: center; /* horizontal */
     align-items: flex-start;     /* vertical */
     gap: 10px;
@@ -470,6 +506,11 @@ label{
     font-family: Arial, Helvetica, sans-serif;
     padding: 5px;
 }
+.textarea-containers textarea{
+    width: 300px;
+    min-height: 40px;
+    max-width: 900px;
+}
 .bio{
     width: fit-content;
     background-color: var(--secondery);
@@ -510,7 +551,7 @@ label{
     display: flex;
     flex-direction: column;
 }
-.stat-edit{
+.stat-edit input[type="number"]{
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -524,14 +565,16 @@ label{
 }
 #bottom input[type="number"],
 #points-remaining,
-#Exstra-points {
+#Exstra-points, 
+#number{
     background-color: var(--background);
     border: 2px solid var(--accent-color);
     color: var(--accent-color);
     font-size: large;
     border-radius: 4px;
-    width: 50px;
+    width: 90px;
     margin-left: 10px;
+    text-align: center;
 }
 #points-remaining label,
 #Exstra-points label {
@@ -553,7 +596,7 @@ input[type=number]::-webkit-outer-spin-button {
     color: var(--accent-color);
     font-size: large;
     border-radius: 4px;
-    width: 1fr;
+    width: 100%;
 }
 .inputval{
     background-color: var(--background);
@@ -561,7 +604,7 @@ input[type=number]::-webkit-outer-spin-button {
     color: var(--accent-color);
     font-size: large;
     border-radius: 4px;
-    width: 1fr;
+    width: 100%;
 }
 #speed-edit, #speed{
     font-size: medium;
@@ -596,29 +639,101 @@ input[type=number]::-webkit-outer-spin-button {
     font-size: large;
     text-align: center;
 }
-#inventory-container {
+#inventory-container, #status-effects-container {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     grid-auto-rows: min-content;
     align-items: start;
     gap: 8px;
+}
+#inventory-container textarea, #status-effects-container textarea {
+    width: 50%;
+    max-width: 300px;
+    box-sizing: border-box;
 }
 #inventory-container textarea {
-    width: 50%;
-    max-width: 300px;
     max-height: 500px;
-    box-sizing: border-box;
 }
-#status-effects-container {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-auto-rows: min-content;
-    align-items: start;
-    gap: 8px;
-}  
 #status-effects-container textarea {
-    width: 50%;
-    max-width: 300px;
     max-height: 100px;
-    box-sizing: border-box;
+}
+.organic{
+    display: block;
+}
+.mech{
+    display: none;
+}
+/* Status Effects Viewer in header */
+.status-effects-header-viewer {
+    background: var(--secondery);
+    border-radius: 8px;
+    margin-left: 10px;
+    max-height: 70px;
+    min-width: 120px;
+    max-width: 200px;
+    overflow-y: scroll;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 6px 10px;
+    font-size: small;
+    color: var(--accent-color);
+    background-color: var(--background);
+}
+.status-effects-header-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+    width: 100%;
+    text-align: left;
+}
+#status-effects-header-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Mobile Responsive Styles */
+@media only screen and (max-width: 768px) {
+    #center {
+        flex-direction: column;
+    }
+    #left-side, #right-side {
+        width: 100%;
+        height: auto;
+        overflow-y: visible;
+        position: static;
+    }
+    #right-side {
+        order: -1; /* Moves tabs to the top */
+        background: transparent;
+        border: none;
+        padding: 0;
+    }
+    .tabgrub {
+        background-color: var(--secondery);
+        border: 4px solid rgba(0, 0, 0, 0.39);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        padding: 5px;
+        margin-bottom: 0;
+    }
+    #statsTab {
+        display: block;
+    }
+    #left-side,
+    #Actions, #Traits, #Inventory, #StatusEffects, #Notes {
+        background-color: var(--secondery);
+        border: 4px solid rgba(0, 0, 0, 0.39);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        padding: 10px;
+        margin-top: 0;
+    }
+    #left-side {
+        display: none;
+    }
+    #left-side.active {
+        display: flex;
+    }
 }

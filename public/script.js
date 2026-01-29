@@ -1,1317 +1,650 @@
-// Auto-load character data on page load
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.location.pathname.endsWith('charactersheet.html')) {
-        loadCharacterSheet();
-    }
-});
-// --- Character Sheet Save/Load ---
-async function saveCharacterSheet() {
-    // Collect all relevant fields in the same structure as the JSON loader expects
-    const data = {};
-    // Basic info
-    data.name = document.getElementById('chn').value;
-    data.gender = document.getElementById('gender').value;
-    data.race = document.getElementById('race').value;
-    data.class = document.getElementById('class').value;
-    data.background = document.getElementById('background') ? document.getElementById('background').value : '';
-    data.level = document.getElementById('level-value').value || document.getElementById('level-change')?.value || 1;
-    data.exstrapoints = document.getElementById('Exstra-points')?.value || 0;
-    data.speed = document.getElementById('speed').value || document.getElementById('speed-edit')?.value || 5;
-    // Coins
-    data.coins = {
-        credits: document.getElementById('credits')?.value || '',
-        doch: document.getElementById('doch')?.value || '',
-        renown: document.getElementById('renown')?.value || ''
-    };
-    // Status
-    data.status = document.getElementById('status')?.value || '';
-    // Stats
-    data.stats = {};
-    ['ws','bs','str','tn','dex','per','int','wp','fel'].forEach(stat => {
-        data.stats[stat] = document.querySelector('.stat-edit #'+stat)?.value || document.querySelector('.stat #'+stat)?.value || '';
+/**
+ * Jack Knife Character Sheet Logic
+ * Handles state management, UI updates, and persistence.
+ */
+
+// --- Global State & Elements ---
+const state = {
+    isEditing: false,
+    organicRace: true,
+    basePoints: 9,
+    woundsCount: 2,
+    staminaCount: 1
+};
+
+// UI Element Mappings
+const elements = {
+    // Displays
+    chn: document.getElementById('chn'),
+    gender: document.getElementById('gender'),
+    race: document.getElementById('race'),
+    class: document.getElementById('class'),
+    level: document.getElementById('level-value'),
+    status: document.getElementById('status-display'),
+    speed: document.getElementById('speed'),
+    pfp: document.getElementById('pfp'),
+    background: document.getElementById('background'),
+    dashAction: document.getElementById('dash-action'),
+    
+    // Stats Displays
+    statsDisp: {
+        ws: document.getElementById('ws-display'),
+        bs: document.getElementById('bs-display'),
+        tn: document.getElementById('tn-display'),
+        str: document.getElementById('str-display'),
+        dex: document.getElementById('dex-display'),
+        int: document.getElementById('int-display'),
+        per: document.getElementById('per-display'),
+        wp: document.getElementById('wp-display'),
+        fel: document.getElementById('fel-display')
+    },
+
+    // Edit Inputs
+    edit: {
+        chn: document.getElementById('chn-edit'),
+        gender: document.getElementById('gender-edit'),
+        race: document.getElementById('race-edit'),
+        class: document.getElementById('class-edit'),
+        speed: document.getElementById('speed-edit'),
+        background: document.getElementById('background-edit'),
+        status: document.getElementById('status'),
+        level: document.getElementById('level-change'),
+        extraPoints: document.getElementById('Exstra-points'),
+        pointsRem: document.getElementById('points-remaining'),
+        woundsMod: document.getElementById('wounds-mod'),
+        staminaMod: document.getElementById('stamina-mod'),
+        // Stat Inputs
+        ws: document.getElementById('ws'),
+        bs: document.getElementById('bs'),
+        tn: document.getElementById('tn'),
+        str: document.getElementById('str'),
+        dex: document.getElementById('dex'),
+        int: document.getElementById('int'),
+        per: document.getElementById('per'),
+        wp: document.getElementById('wp'),
+        fel: document.getElementById('fel')
+    },
+
+    // Containers & Modals
+    overlay: document.getElementById('overly'),
+    woundsCont: document.querySelector('#wounds .check-boxs'),
+    staminaCont: document.querySelector('#stamina .check-boxs'),
+    
+    // Buttons
+    editBtn: document.getElementById('edit-btn'),
+    closeBtn: document.getElementById('close-btn'),
+    saveBtn: document.getElementById('save-btn'),
+    loadBtn: document.getElementById('load-btn'),
+    loadFile: document.getElementById('load-file'),
+    pfpBtn: document.getElementById('pfp-btn'),
+    pfpInput: document.getElementById('pfp-file')
+};
+
+// --- Initialization ---
+window.onload = async () => {
+    setupTabs();
+    setupEventListeners();
+    updatePointsRemaining();
+    renderCheckboxes();
+    syncEditToDisplay();
+    // Display the currently logged-in user
+    displayLoggedInUser();
+    // Automatically load character data from the server on page load
+    await loadCharacterFromServer(true);
+};
+
+// --- UI Logic ---
+
+function setupTabs() {
+    const tabs = ['statsTab', 'actionsTab', 'traitsTab', 'inventoryTab', 'statusEffectsTab', 'notesTab'];
+    const contents = ['left-side', 'Actions', 'Traits', 'Inventory', 'StatusEffects', 'Notes'];
+
+    tabs.forEach((tabId, index) => {
+        const tabEl = document.getElementById(tabId);
+        if (!tabEl) return;
+
+        tabEl.addEventListener('click', () => {
+            tabs.forEach(t => {
+                const el = document.getElementById(t);
+                if (el) el.classList.remove('active');
+            });
+            contents.forEach(c => {
+                const el = document.getElementById(c);
+                if (el) el.classList.remove('active');
+            });
+            
+            tabEl.classList.add('active');
+            const contentEl = document.getElementById(contents[index]);
+            if (contentEl) contentEl.classList.add('active');
+        });
     });
-    // Wounds/Stamina modifiers
-    data.woundsMod = document.getElementById('wounds-mod')?.value || '';
-    data.staminaMod = document.getElementById('stamina-mod')?.value || '';
-    // Wounds/Stamina checked state and count (for added checkboxes)
-    const woundsBoxes = document.getElementById('wounds').getElementsByClassName('check-boxs')[0].querySelectorAll('input[type="checkbox"]');
-    data.woundsChecked = Array.from(woundsBoxes).map(cb => cb.checked);
-    data.woundsCount = woundsBoxes.length;
-    const staminaBoxes = document.getElementById('stamina').getElementsByClassName('check-boxs')[0].querySelectorAll('input[type="checkbox"]');
-    data.staminaChecked = Array.from(staminaBoxes).map(cb => cb.checked);
-    data.staminaCount = staminaBoxes.length;
-    // Dynamic textboxes
-    data.textboxes = {};
-    document.querySelectorAll('.text-box').forEach(tb => {
-        data.textboxes[tb.id] = {
-            value: tb.value,
-            rows: tb.rows,
-            cols: tb.cols,
-            styleWidth: tb.style.width,
-            styleHeight: tb.style.height
-        };
+}
+
+function setupEventListeners() {
+    // Modal Toggle
+    elements.editBtn.addEventListener('click', () => elements.overlay.style.display = 'flex');
+    elements.closeBtn.addEventListener('click', () => {
+        elements.overlay.style.display = 'none';
+        syncEditToDisplay();
     });
-    // Profile picture: always save as data URL, even for default
-    const pfpImg = document.getElementById('pfp');
-    if (pfpImg) {
-        let done = false;
-        if (pfpImg.dataset.pfpDataUrl) {
-            data.pfpDataUrl = pfpImg.dataset.pfpDataUrl;
-            done = true;
-        } else if (pfpImg.src && pfpImg.src.startsWith('data:')) {
-            data.pfpDataUrl = pfpImg.src;
-            done = true;
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && elements.overlay.style.display === 'flex') {
+            elements.overlay.style.display = 'none';
+            syncEditToDisplay();
         }
-        if (!done) {
-            // Convert the current image (even default) to a data URL
-            try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const img = pfpImg;
-                canvas.width = img.naturalWidth || 84;
-                canvas.height = img.naturalHeight || 84;
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                data.pfpDataUrl = canvas.toDataURL('image/png');
-            } catch (e) {
-                data.pfpDataUrl = null;
+    });
+
+    // Stat Point Calculation
+    const statInputs = [
+        elements.edit.ws, elements.edit.bs, elements.edit.tn, 
+        elements.edit.str, elements.edit.dex, elements.edit.int, 
+        elements.edit.per, elements.edit.wp, elements.edit.fel,
+        elements.edit.extraPoints,
+        elements.edit.level
+    ];
+    statInputs.forEach(input => input.addEventListener('input', updatePointsRemaining));
+    elements.edit.tn.addEventListener('input', renderCheckboxes);
+    elements.edit.dex.addEventListener('input', renderCheckboxes);
+    document.getElementById('add-check-box').addEventListener('click', () => addCustomTracker());
+
+    // Live Update Listeners
+    const liveInputs = [
+        elements.edit.chn, elements.edit.gender, elements.edit.race,
+        elements.edit.class, elements.edit.level, elements.edit.status,
+        elements.edit.speed, elements.edit.background,
+        elements.edit.ws, elements.edit.bs, elements.edit.tn,
+        elements.edit.str, elements.edit.dex, elements.edit.int,
+        elements.edit.per, elements.edit.wp, elements.edit.fel
+    ];
+    liveInputs.forEach(input => input.addEventListener('input', syncEditToDisplay));
+
+    // Dynamic Checkbox Counts
+    elements.edit.woundsMod.addEventListener('input', renderCheckboxes);
+    elements.edit.staminaMod.addEventListener('input', renderCheckboxes);
+
+    // Status to Credits Logic
+    elements.edit.status.addEventListener('change', (e) => {
+        const creditsInput = document.getElementById('credits');
+        const val = e.target.value;
+        if (val === 'Wealthy') creditsInput.value = 1000;
+        else if (val === 'Middle') creditsInput.value = 500;
+        else if (val === 'Poor') creditsInput.value = 50;
+        else if (val === 'Destitute') creditsInput.value = 0;
+    });
+
+    // Profile Picture Logic
+    elements.pfpBtn.addEventListener('click', () => elements.pfpInput.click());
+    elements.pfpInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type is JPEG
+            if (file.type !== 'image/jpeg') {
+                alert('Please upload a JPEG or JPG image.');
+                return;
             }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                elements.pfp.src = event.target.result;
+                document.getElementById('pfp-viewer').src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         }
-    }
-    // Extra checkboxes (save checked state, always save number, label, checked)
-    data.extraCheckboxes = [];
-    document.querySelectorAll(".check-boxs-container").forEach(container => {
-        if (container.id === 'wounds' || container.id === 'stamina') return;
-        let numInput = container.querySelector(".inputval");
-        let labelInput = container.querySelector(".check-box-exstras");
-        let num = numInput ? parseInt(numInput.value) : 1;
-        let label = labelInput ? labelInput.value : '';
-        let checked = Array.from(container.querySelectorAll('input[type=\"checkbox\"]')).map(cb => cb.checked);
-        data.extraCheckboxes.push({number: num, text: label, checked});
     });
-    // Mark that a save has occurred and overlay should be closed on next load
-    data.closeOverlayOnLoad = true;
+
+    // Save/Load
+    elements.saveBtn.addEventListener('click', saveCharacter);
+    elements.loadBtn.addEventListener('click', loadCharacterFromServer);
+    elements.loadFile.addEventListener('change', loadCharacterFromFile);
+
+    // Add list items (Actions, Traits, etc)
+    setupListAdders();
+}
+
+function updatePointsRemaining() {
+    // Calculate total value of all stats (defaulting to 1 if empty/invalid)
+    const totalStats = 
+        (parseInt(elements.edit.ws.value) || 1) + (parseInt(elements.edit.bs.value) || 1) +
+        (parseInt(elements.edit.tn.value) || 1) + (parseInt(elements.edit.str.value) || 1) +
+        (parseInt(elements.edit.dex.value) || 1) + (parseInt(elements.edit.int.value) || 1) +
+        (parseInt(elements.edit.per.value) || 1) + (parseInt(elements.edit.wp.value) || 1) +
+        (parseInt(elements.edit.fel.value) || 1);
+    
+    // Cost is value - 1 (since base is 1). Total cost = sum(values) - 9.
+    const spentPoints = totalStats - 9;
+
+    const extra = parseInt(elements.edit.extraPoints.value) || 0;
+    const level = parseInt(elements.edit.level.value) || 1;
+    
+    // 9 base points + 1 per level above 1 + extra points
+    const available = state.basePoints + (level - 1) + extra;
+    const remaining = available - spentPoints;
+    
+    elements.edit.pointsRem.value = remaining;
+    elements.edit.pointsRem.style.color = remaining < 0 ? 'red' : 'white';
+}
+
+function renderCheckboxes() {
+    const wMod = parseInt(elements.edit.woundsMod.value) || 0;
+    const sMod = parseInt(elements.edit.staminaMod.value) || 0;
+    const tn = parseInt(elements.edit.tn.value) || 1;
+    const dex = parseInt(elements.edit.dex.value) || 1;
+
+    // Preserve currently checked boxes
+    const currentW = elements.woundsCont.querySelectorAll('input:checked').length;
+    const currentS = elements.staminaCont.querySelectorAll('input:checked').length;
+
+    const wCount = wMod * tn;
+    const sCount = sMod * dex;
+
+    elements.woundsCont.innerHTML = '';
+    elements.staminaCont.innerHTML = '';
+
+    for(let i=0; i<wCount; i++) {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        if (i < currentW) cb.checked = true;
+        elements.woundsCont.appendChild(cb);
+    }
+    
+    for(let i=0; i<sCount; i++) {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        if (i < currentS) cb.checked = true;
+        elements.staminaCont.appendChild(cb);
+    }
+}
+
+function syncEditToDisplay() {
+    // Header Info
+    elements.chn.value = elements.edit.chn.value;
+    elements.gender.value = elements.edit.gender.value;
+    elements.race.value = elements.edit.race.value;
+    elements.class.value = elements.edit.class.value;
+    elements.level.value = elements.edit.level.value;
+    elements.status.value = elements.edit.status.value;
+    elements.speed.value = elements.edit.speed.value;
+    elements.background.value = elements.edit.background.value;
+
+    // Update Dash Action
+    const speedVal = parseInt(elements.edit.speed.value) || 0;
+    if (elements.dashAction) {
+        elements.dashAction.textContent = `Dash [Move ${speedVal * 2} tiles] (1 stamina)`;
+    }
+
+    // Stats
+    for (const key in elements.statsDisp) {
+        elements.statsDisp[key].value = elements.edit[key].value;
+    }
+
+    // Handle Organic vs Mechanical styling
+    const selectedRace = elements.edit.race.options[elements.edit.race.selectedIndex];
+    const isOrganic = selectedRace.getAttribute('data-organic') === "true";
+    document.querySelectorAll('.organic').forEach(el => el.style.display = isOrganic ? 'block' : 'none');
+    document.querySelectorAll('.mech').forEach(el => el.style.display = isOrganic ? 'none' : 'block');
+}
+
+// --- List Management ---
+
+function updateStatusEffectsDisplay() {
+    const container = document.getElementById('status-effects-container');
+    const list = document.getElementById('status-effects-header-list');
+    list.innerHTML = '';
+    
+    container.querySelectorAll('textarea').forEach(textarea => {
+        if (textarea.value.trim()) {
+            const item = document.createElement('div');
+            item.textContent = textarea.value;
+            list.appendChild(item);
+        }
+    });
+}
+
+function addListItem(containerId, text = '', width = null, height = null) {
+    const container = document.getElementById(containerId);
+    const newItem = document.createElement('div');
+    newItem.className = 'list-item-row';
+    newItem.innerHTML = `
+        <textarea placeholder="New entry...">${text}</textarea>
+        <button class="del-btn">×</button>
+    `;
+    
+    const textarea = newItem.querySelector('textarea');
+    if (width) textarea.style.width = width;
+    if (height) textarea.style.height = height;
+    
+    // Add listener for status effects to update header immediately
+    if (containerId === 'status-effects-container') {
+        textarea.addEventListener('input', updateStatusEffectsDisplay);
+    }
+
+    newItem.querySelector('.del-btn').onclick = () => {
+        newItem.remove();
+        if (containerId === 'status-effects-container') updateStatusEffectsDisplay();
+    };
+    
+    container.appendChild(newItem);
+    if (containerId === 'status-effects-container') updateStatusEffectsDisplay();
+}
+
+function setupListAdders() {
+    const listMap = {
+        'add-action-button': 'actions-container',
+        'add-bonus-action-button': 'bonus-actions-container',
+        'add-other-button': 'other-container',
+        'add-trait-button': 'traits-container',
+        'add-resistences-button': 'resistances-container',
+        'add-immunities-button': 'immunities-container',
+        'add-weaknesses-button': 'weaknesses-container',
+        'add-inventory-button': 'inventory-container',
+        'add-status-effects-button': 'status-effects-container',
+        'add-notes-button': 'notes-container'
+    };
+
+    Object.entries(listMap).forEach(([btnId, contId]) => {
+        document.getElementById(btnId).addEventListener('click', () => addListItem(contId));
+    });
+}
+
+function addCustomTracker(name = 'New Tracker', max = 1, current = 0) {
+    const container = document.getElementById('check-boxs');
+    const div = document.createElement('div');
+    div.className = 'check-boxs-container custom-tracker';
+    
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.gap = '5px';
+    header.style.marginBottom = '5px';
+    header.style.alignItems = 'center';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = name;
+    nameInput.className = 'tracker-name';
+    nameInput.placeholder = "Name";
+    nameInput.style.width = '200px';    
+
+    const maxInput = document.createElement('input');
+    maxInput.type = 'number';
+    maxInput.value = max;
+    maxInput.className = 'tracker-max';
+    maxInput.min = 1;
+    maxInput.style.width = '48px';
+    maxInput.style.textAlign = 'start';
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'DELETE';
+    delBtn.className = 'del-btn';
+    delBtn.style.height = '25px';
+    delBtn.onclick = () => div.remove();
+
+    header.appendChild(nameInput);
+    header.appendChild(maxInput);
+    header.appendChild(delBtn);
+
+    const boxesDiv = document.createElement('div');
+    boxesDiv.className = 'check-boxs';
+
+    const render = (preserve = false) => {
+        const count = parseInt(maxInput.value) || 0;
+        const currentChecked = preserve ? boxesDiv.querySelectorAll('input:checked').length : current;
+        
+        boxesDiv.innerHTML = '';
+        for(let i=0; i<count; i++) {
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            if (i < currentChecked) cb.checked = true;
+            boxesDiv.appendChild(cb);
+        }
+        if (!preserve) current = 0; 
+    };
+
+    maxInput.addEventListener('input', () => render(true));
+
+    div.appendChild(header);
+    div.appendChild(boxesDiv);
+    container.appendChild(div);
+    
+    render(false);
+}
+
+async function displayLoggedInUser() {
+    const usernameDisplay = document.getElementById('username-display');
+    if (!usernameDisplay) return;
+
+    try {
+        const res = await fetch('/whoami');
+        if (res.ok) {
+            const { username } = await res.json();
+            usernameDisplay.textContent = username || 'Guest';
+        } else {
+            usernameDisplay.textContent = 'Guest';
+        }
+    } catch (error) {
+        console.error('Error fetching user status:', error);
+        usernameDisplay.textContent = 'N/A';
+    }
+}
+
+// --- Data Persistence ---
+
+async function saveCharacter() {
+    // Helper to get values from textareas in a container
+    const getListValues = (id) => {
+        const container = document.getElementById(id);
+        return Array.from(container.querySelectorAll('textarea')).map(t => ({
+            text: t.value,
+            width: t.style.width,
+            height: t.style.height
+        }));
+    };
+
+    const characterData = {
+        header: {
+            name: elements.edit.chn.value,
+            gender: elements.edit.gender.value,
+            race: elements.edit.race.value,
+            class: elements.edit.class.value,
+            level: elements.edit.level.value,
+            status: elements.edit.status.value,
+            speed: elements.edit.speed.value,
+            background: elements.edit.background.value,
+            credits: document.getElementById('credits').value,
+            doch: document.getElementById('doch').value,
+            renown: document.getElementById('renown').value
+        },
+        stats: {
+            ws: elements.edit.ws.value,
+            bs: elements.edit.bs.value,
+            tn: elements.edit.tn.value,
+            str: elements.edit.str.value,
+            dex: elements.edit.dex.value,
+            int: elements.edit.int.value,
+            per: elements.edit.per.value,
+            wp: elements.edit.wp.value,
+            fel: elements.edit.fel.value,
+            extra: elements.edit.extraPoints.value
+        },
+        mods: {
+            wounds: elements.edit.woundsMod.value,
+            stamina: elements.edit.staminaMod.value
+        },
+        statusState: {
+            wounds: document.querySelectorAll('#wounds input:checked').length,
+            stamina: document.querySelectorAll('#stamina input:checked').length
+        },
+        customTrackers: Array.from(document.querySelectorAll('.custom-tracker')).map(el => ({
+            name: el.querySelector('.tracker-name').value,
+            max: parseInt(el.querySelector('.tracker-max').value) || 0,
+            current: el.querySelectorAll('input:checked').length
+        })),
+        appearance: {
+            pfp: elements.pfp.src
+        },
+        lists: {
+            actions: getListValues('actions-container'),
+            bonusActions: getListValues('bonus-actions-container'),
+            other: getListValues('other-container'),
+            traits: getListValues('traits-container'),
+            resistances: getListValues('resistances-container'),
+            immunities: getListValues('immunities-container'),
+            weaknesses: getListValues('weaknesses-container'),
+            inventory: getListValues('inventory-container'),
+            statusEffects: getListValues('status-effects-container'),
+            notes: getListValues('notes-container')
+        }
+    };
+
     try {
         const res = await fetch('/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data })
+            body: JSON.stringify({ data: characterData })
         });
         const result = await res.json();
         if (result.success) {
-            alert('Character saved!');
+            alert('Character saved successfully!');
         } else {
-            alert('Save failed');
+            alert('Failed to save character.');
         }
-    } catch (err) {
-        alert('Error saving character');
+    } catch (error) {
+        console.error('Error saving character:', error);
+        alert('An error occurred while saving.');
     }
 }
 
-async function loadCharacterSheet() {
-    try {
-        const res = await fetch('/data');
-        if (!res.ok) throw new Error('Not logged in or error loading');
-        const result = await res.json();
-        const data = result.data || {};
-        // Use the same loader as the JSON import for full UI restoration
-        // Restore wounds/stamina box count before loading data
-        if (typeof data.woundsCount === 'number') {
-            let woundsContainer = document.getElementById('wounds').getElementsByClassName('check-boxs')[0];
-            woundsContainer.innerHTML = '';
-            for (let i = 0; i < data.woundsCount; i++) {
-                let checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                woundsContainer.appendChild(checkbox);
-            }
-        }
-        if (typeof data.staminaCount === 'number') {
-            let staminaContainer = document.getElementById('stamina').getElementsByClassName('check-boxs')[0];
-            staminaContainer.innerHTML = '';
-            for (let i = 0; i < data.staminaCount; i++) {
-                let checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                staminaContainer.appendChild(checkbox);
-            }
-        }
-        // Restore extra checkboxes (user-added groups)
-        if (Array.isArray(data.extraCheckboxes)) {
-            let checkboxs = document.getElementById('check-boxs');
-            // Remove all user-added groups except wounds/stamina
-            Array.from(checkboxs.querySelectorAll('.check-boxs-container')).forEach(container => {
-                if (container.id !== 'wounds' && container.id !== 'stamina') container.remove();
-            });
-            data.extraCheckboxes.forEach((group, idx) => {
-                // Container for each group
-                let chbc = document.createElement('div');
-                chbc.className = "check-boxs-container";
-                chbc.style = 'display: grid; grid-template-columns: 60% 20%; gap: 10px;';
-                checkboxs.appendChild(chbc);
+function populateSheet(data) {
+    if (!data) return;
 
-                // Label input
-                let inputforchc = document.createElement('input');
-                inputforchc.placeholder = `check box ${idx+1}`;
-                inputforchc.className = 'check-box-exstras';
-                inputforchc.value = group.text;
-                chbc.appendChild(inputforchc);
-
-                // Number input
-                let inputval = document.createElement('input');
-                inputval.type = 'number';
-                inputval.value = group.number;
-                inputval.min = 1;
-                inputval.max = 40;
-                inputval.className = 'inputval';
-                chbc.appendChild(inputval);
-
-                // Div to hold the checkboxes
-                let div = document.createElement('div');
-                div.className = 'check-boxs';
-                chbc.appendChild(div);
-
-                // Add checkboxes and set checked state
-                function renderCheckboxes(checkedArr) {
-                    div.innerHTML = '';
-                    let count = checkedArr ? checkedArr.length : (parseInt(inputval.value) || 1);
-                    for (let i = 0; i < count; i++) {
-                        let checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = checkedArr ? !!checkedArr[i] : false;
-                        div.appendChild(checkbox);
-                    }
-                }
-                // Initial render with loaded checked state
-                renderCheckboxes(group.checked);
-
-                // Delete button for this group
-                let delBtn = document.createElement('button');
-                delBtn.textContent = 'Delete';
-                delBtn.className = 'delete-btn';
-                delBtn.style.gridColumn = 'span 2';
-                delBtn.style.height = '30px';
-                delBtn.style.width = '70px';
-                delBtn.addEventListener('click', () => {
-                    chbc.remove();
-                });
-                chbc.appendChild(delBtn);
-
-                // Function to update checkboxes based on inputval, preserving checked state if possible
-                function updateexstra() {
-                    let val = parseInt(inputval.value) || 1;
-                    let prevChecked = Array.from(div.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
-                    div.innerHTML = '';
-                    for (let i = 0; i < val; i++) {
-                        let checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = prevChecked[i] || false;
-                        div.appendChild(checkbox);
-                    }
-                }
-                inputval.addEventListener('input', updateexstra);
-            });
-        }
-        loadCharacterData(data);
-        safeCall(pagereload);
-    } catch (err) {
-        alert('Error loading character');
-    }
-}
-
-document.getElementById('save-btn').addEventListener('click', saveCharacterSheet);
-document.getElementById('load-btn').addEventListener('click', loadCharacterSheet);
-// JavaScript Document
-
-// Wounds input logic and checkbox generation
-let numberOfWounds = document.querySelector(`.stat-edit #tn`); // changed to tn in the overly
-let woundsmod = document.getElementById("wounds-mod"); // Wounds modifier in the overly
-let woundsContainer = document.getElementById("wounds").getElementsByClassName("check-boxs")[0];
-
-function updateWounds() {
-    let desiredWounds = Math.max((parseInt(numberOfWounds.value) || 0) * parseInt(woundsmod.value), 2);
-    woundsContainer.innerHTML = '';
-    for (let i = 0; i < desiredWounds; i++) {
-        let checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        woundsContainer.appendChild(checkbox);
-    }
-}
-
-numberOfWounds.addEventListener('input', function() {
-    updateWounds();
-});
-
-woundsmod.addEventListener('input', function() {
-    updateWounds();
-});
-
-// Stamina input logic and checkbox generation
-let numberOfstamina = document.querySelector(`.stat-edit #dex`); // changed to dex in the overly
-let staminamod = document.getElementById("stamina-mod"); // Stamina modifier in the overly
-let staminaContainer = document.getElementById("stamina").getElementsByClassName("check-boxs")[0];
-
-function updatestamina() {
-    let desiredStamina = Math.max((parseInt(numberOfstamina.value) || 0) * parseInt(staminamod.value), 1);
-    staminaContainer.innerHTML = '';
-    for (let i = 0; i < desiredStamina; i++) {
-        let checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        staminaContainer.appendChild(checkbox);
-    }
-}
-
-numberOfstamina.addEventListener('input', function() {
-    updatestamina();
-});
-
-staminamod.addEventListener('input', function() {
-    updatestamina();
-});
-
-// Tab grup actions
-const actionsTab = document.getElementById('actionsTab');
-const traitsTab = document.getElementById('traitsTab');
-const inventoryTab = document.getElementById('inventoryTab');
-const statusEffectsTab = document.getElementById('statusEffectsTab');
-const notesTab = document.getElementById('notesTab');
-const actions = document.getElementById('Actions');
-const traits = document.getElementById('Traits');
-const inventory = document.getElementById('Inventory');
-const statusEffects = document.getElementById('StatusEffects');
-const notes = document.getElementById('Notes');
-
-const updateTabs = (activeTab) => {
-    actions.classList.remove('active');
-    traits.classList.remove('active');
-    inventory.classList.remove('active');
-    statusEffects.classList.remove('active');
-    notes.classList.remove('active');
-    actionsTab.classList.remove('active');
-    traitsTab.classList.remove('active');
-    inventoryTab.classList.remove('active');
-    statusEffectsTab.classList.remove('active');
-    notesTab.classList.remove('active');
-
-    // Fix for StatusEffects casing
-    let tabId = activeTab;
-    let btnId = activeTab;
-    if (tabId === 'StatusEffects') btnId = 'statusEffectsTab';
-    else if (tabId === 'Notes') btnId = 'notesTab';
-    else btnId = `${activeTab.toLowerCase()}Tab`;
-
-    document.getElementById(tabId).classList.add('active');
-    document.getElementById(btnId).classList.add('active');
-};
-
-actionsTab.addEventListener('click', () => updateTabs('Actions'));
-traitsTab.addEventListener('click', () => updateTabs('Traits'));
-inventoryTab.addEventListener('click', () => updateTabs('Inventory'));
-statusEffectsTab.addEventListener('click', () => updateTabs('StatusEffects'));
-notesTab.addEventListener('click', () => updateTabs('Notes'));
-
-updateTabs('Actions'); // Set initial active tab
-
-// Text Box Addition Logic
-function addTabs(section) {
-    let sectionContainer = document.getElementById(section.toLowerCase() + '-container');
-    let boxIndex = (sectionContainer.getElementsByClassName('text-box').length).valueOf() + 1;
-    let textBox = document.createElement('textarea');
-    textBox.rows = 2;
-    textBox.cols = 30;
-    textBox.className = 'text-box';
-    textBox.placeholder = `${section} ${boxIndex}`;
-    textBox.id = `${section}-textbox-${boxIndex}`;
-
-    // Restore size from localStorage if available
-    const sizeKey = `textarea-size-${textBox.id}`;
-    const savedSize = localStorage.getItem(sizeKey);
-    if (savedSize) {
-        try {
-            const { width, height } = JSON.parse(savedSize);
-            if (width) textBox.style.width = width + 'px';
-            if (height) textBox.style.height = height + 'px';
-        } catch (e) {}
+    // Populate Header
+    if (data.header) {
+        elements.edit.chn.value = data.header.name || '';
+        elements.edit.gender.value = data.header.gender || 'Other';
+        elements.edit.race.value = data.header.race || 'Human';
+        elements.edit.class.value = data.header.class || '';
+        elements.edit.level.value = data.header.level || 1;
+        elements.edit.status.value = data.header.status || 'Middle';
+        elements.edit.speed.value = data.header.speed || 6;
+        elements.edit.background.value = data.header.background || '';
+        document.getElementById('credits').value = data.header.credits || 0;
+        document.getElementById('doch').value = data.header.doch || 0;
+        document.getElementById('renown').value = data.header.renown || 0;
     }
 
-    // Save size on mouseup (after resize) and input
-    function saveTextareaSize() {
-        const width = textBox.offsetWidth;
-        const height = textBox.offsetHeight;
-        localStorage.setItem(sizeKey, JSON.stringify({ width, height }));
-    }
-    textBox.addEventListener('mouseup', saveTextareaSize);
-    textBox.addEventListener('input', saveTextareaSize);
-
-    // Create delete button
-    let deleteBtn = document.createElement('button');
-    deleteBtn.textContent = "X";
-    deleteBtn.className = "delete-btn";
-
-    // Wrap textarea + button together
-    let wrapper = document.createElement('div');
-    wrapper.className = "textbox-wrapper";
-    wrapper.appendChild(textBox);
-    wrapper.appendChild(deleteBtn);
-
-        // Add delete functionality
-        deleteBtn.addEventListener('click', () => {
-            sectionContainer.removeChild(wrapper);
-            // If this is the status effects section, update the header viewer
-            if (sectionContainer.id === 'status-effects-container') {
-                if (typeof updateStatusEffectsHeaderViewer === 'function') {
-                    updateStatusEffectsHeaderViewer();
-                }
-            }
+    // Populate Stats
+    if (data.stats) {
+        Object.entries(data.stats).forEach(([key, val]) => {
+            if (elements.edit[key]) elements.edit[key].value = val;
         });
-
-    // Append wrapper to container
-    sectionContainer.appendChild(wrapper);
-}
-// Actions Section
-    let addActionButton = document.getElementById('add-action-button');
-    addActionButton.addEventListener('click', () => {
-        addTabs('actions');
-    });
-// bunus Actions Section
-    let addBonusActionButton = document.getElementById('add-bonus-action-button');
-    addBonusActionButton.addEventListener('click', () => {
-        addTabs('bonus-actions');
-    });
-// Other Section
-    let addOtherButton = document.getElementById('add-other-button');
-    addOtherButton.addEventListener('click', () => {
-        addTabs('other');
-    });
-// tarits Section
-    let addTraitButton = document.getElementById('add-trait-button');
-    addTraitButton.addEventListener('click', () => {
-        addTabs('traits');
-    });
-// resistances Section
-    let addResistencesButton = document.getElementById('add-resistences-button');
-    addResistencesButton.addEventListener('click', () => {
-        addTabs('resistances');
-    });
-// immunities Section
-    let addImmunitiesButton = document.getElementById('add-immunities-button');
-    addImmunitiesButton.addEventListener('click', () => {
-        addTabs('immunities');
-    });
-// weaknesses Section
-    let addWeaknessesButton = document.getElementById('add-weaknesses-button');
-    addWeaknessesButton.addEventListener('click', () => {
-        addTabs('weaknesses');
-    });
-// invertory Section
-    let addInventoryButton = document.getElementById('add-inventory-button');
-    addInventoryButton.addEventListener('click', () => {
-        addTabs('inventory');
-    });
-// status effects Section
-    let addStatusEffectsButton = document.getElementById('add-status-effects-button');
-    addStatusEffectsButton.addEventListener('click', () => {
-        addTabs('status-effects');
-    });
-// notes Section
-    let addNotesButton = document.getElementById('add-notes-button');
-    addNotesButton.addEventListener('click', () => {
-        addTabs('notes');
-    });
-
-// overly edit menu logic
-let editbtn = document.getElementById("edit-btn");
-let overly = document.getElementById("overly");
-
-// Speed sync logic
-let speedEdit = document.getElementById("speed-edit");
-let speedDisplay = document.getElementById("speed");
-if (speedEdit && speedDisplay) {
-    // Sync edit to display
-    function updateSpeed() {
-        speedDisplay.value = speedEdit.value;
-    }
-    speedEdit.addEventListener("input", updateSpeed);
-    // Initial sync
-    updateSpeed();
-}
-
-editbtn.addEventListener("click", function() {
-    overly.style.display = "flex";
-});
-
-window.addEventListener("keydown", function(event) {
-    if (event.key === "Escape") {
-        if (window.getComputedStyle(overly).display === "flex") {
-            overly.style.display = "none";
-        }
-    }
-});
-
-// name edit logic
-let chnEdit = document.getElementById("chn-edit");
-let chn = document.getElementById("chn");
-
-chnEdit.addEventListener("input", () => {
-    updatechn();
-});
-
-function updatechn(){
-    chn.value = chnEdit.value;
-}
-
-// gender edit logic
-let genderEdit = document.getElementById("gender-edit");
-let gender = document.getElementById("gender");
-
-genderEdit.addEventListener("change", () => {
-    updategender();
-});
-function updategender() {
-    gender.value = genderEdit.value;
-}
-
-// race edit logic
-let raceEdit = document.getElementById("race-edit");
-let race = document.getElementById("race");
-let corentrace = "false";
-let raceOrganic = raceEdit.options[raceEdit.selectedIndex].dataset.organic === "true";
-let organic = document.getElementsByClassName("organic");
-let mech = document.getElementsByClassName("mech");
-raceEdit.addEventListener("change", () => {
-    updaterace();
-});
-
-function updaterace() {
-    const opt = raceEdit.options[raceEdit.selectedIndex];
-
-    // keep your original behavior
-    race.value = raceEdit.value; 
-
-     // read the tag
-    const isOrganic = opt.dataset.organic === "true";
-
-    // use it however you like
-    corentrace = isOrganic ? "true" : "false" ; // or clanker says Victor
-    race.dataset.organic = isOrganic; // optional: store on the input for later
-
-    // show/hide elements based on race
-    if (corentrace === "true") {
-        showorganic();
-    }
-    if (corentrace === "false"){
-        showmech();
-    }
-}
-
-function showorganic(){
-    for (let i = 0; i < organic.length; i++) {
-        organic[i].style.display = "block";
-    }
-    for (let i = 0; i < mech.length; i++) {
-        mech[i].style.display = "none";
-    }
-}
-
-function showmech(){
-    for (let i = 0; i < mech.length; i++) {
-        mech[i].style.display = "block";
-    }
-    for (let i = 0; i < organic.length; i++) {
-        organic[i].style.display = "none";
-    }
-}
-
-// class edit logic
-let classEdit = document.getElementById("class-edit");
-let classField = document.getElementById("class");
-
-classEdit.addEventListener("change", () => {
-    updateclass();
-});
-
-function updateclass() {
-    classField.value = classEdit.value;
-}
-
-// background edit logic
-let backgroundEdit = document.getElementById("background-edit");
-let background = document.getElementById("background");
-
-backgroundEdit.addEventListener("change", () => {
-    updatebackground();
-});
-
-function updatebackground() {
-    background.value = backgroundEdit.value;
-}
-
-// stats
-let stats = ['ws', 'bs', 'str', 'tn', 'dex', 'per', 'int', 'wp', 'fel'];
-let basePoints = 9; // points at level 1
-
-// Sync display (.stat) with editable (.stat-edit)
-stats.forEach((stat) => {
-    const currentStat     = document.querySelector(`.stat #${stat}`);
-    const currentStatEdit = document.querySelector(`.stat-edit #${stat}`);
-
-    if (!currentStat || !currentStatEdit) {
-        console.warn(`Missing element for stat: ${stat}`);
-        return;
+        elements.edit.extraPoints.value = data.stats.extra || 0;
     }
 
-    // Start at 1 if empty or less than 1
-    currentStat.value     = Math.max(1, parseInt(currentStat.value) || 1);
-    currentStatEdit.value = Math.max(1, parseInt(currentStatEdit.value) || 1);
-
-    // Keep them in sync while typing
-    currentStatEdit.addEventListener("input", () => {
-        currentStat.value = currentStatEdit.value;
-        calculatePoints(); // recalc points on change
-    });
-
-    // Enforce minimum only when leaving the field
-    currentStatEdit.addEventListener("blur", () => {
-        let newValue = parseInt(currentStatEdit.value) || 1;
-        if (newValue < 1) newValue = 1;
-        currentStatEdit.value = newValue;
-        currentStat.value = newValue;
-        calculatePoints();
-    });
-});
-
-// level functionality
-let exstrapoints = 0;
-const levelInput = document.querySelector("#level-change");
-let point = document.getElementById('points-remaining');
-let expoint = document.getElementById('Exstra-points');
-
-expoint.addEventListener("input", () => {
-    exstrapoints = parseInt(expoint.value) || 0;
-    calculatePoints(); // recalc whenever extra points change
-    
-});
-
-let warned = false;
-
-function calculatePoints() {
-    let spentPoints = 0;
-    const level = parseInt(levelInput.value) || 1;
-    let totalPoints = basePoints + (level - 1) + exstrapoints;
-    exstrapoints = parseInt(expoint.value) || 0;
-
-    stats.forEach(stat => {
-        const input = document.querySelector(`.stat-edit #${stat}`);
-        let value = parseInt(input.value) || 1;
-        if (value < 1) value = 1;
-        input.value = value;
-        spentPoints += (value - 1);
-    });
-
-    const remaining = totalPoints - spentPoints;
-    point.value = remaining;
-
-    if (remaining < 0 && !warned) {
-        alert("You have spent too many points!");
-        warned = true; // prevent further alerts
+    // Populate Mods
+    if (data.mods) {
+        elements.edit.woundsMod.value = data.mods.wounds || 2;
+        elements.edit.staminaMod.value = data.mods.stamina || 1;
     }
-    if (remaining >= 0) {
-        warned = false; // reset when valid again
+
+    // Render standard checkboxes
+    renderCheckboxes();
+
+    // Restore checked state for standard checkboxes
+    if (data.statusState) {
+        const wBoxes = document.querySelectorAll('#wounds input');
+        for (let i = 0; i < data.statusState.wounds && i < wBoxes.length; i++) wBoxes[i].checked = true;
+
+        const sBoxes = document.querySelectorAll('#stamina input');
+        for (let i = 0; i < data.statusState.stamina && i < sBoxes.length; i++) sBoxes[i].checked = true;
     }
-}
 
-
-// Attach listeners for level changes
-levelInput.addEventListener("input", calculatePoints);
-
-// Initialize
-calculatePoints();
-
-
-let currentlevel = document.getElementById('level-change')
-let levelvalue = document.getElementById('level-value')
-currentlevel.addEventListener("input", () => {
-    levelload();
-});
-function levelload() {
-    levelvalue.value = currentlevel.value
-}
-
-// Initial generation on page load
-document.addEventListener("DOMContentLoaded", () => {
-    pagereload();
-    // Restore textarea sizes for all loaded textareas
-    document.querySelectorAll('.text-box').forEach(textBox => {
-        const sizeKey = `textarea-size-${textBox.id}`;
-        const savedSize = localStorage.getItem(sizeKey);
-        if (savedSize) {
-            try {
-                const { width, height } = JSON.parse(savedSize);
-                if (width) textBox.style.width = width + 'px';
-                if (height) textBox.style.height = height + 'px';
-            } catch (e) {}
-        }
-    });
-});
-
-function safeCall(fn) {
-    try {
-        fn();
-    } catch (e) {
-        console.error("Error in function:", fn.name, e);
+    // Restore Custom Trackers
+    document.querySelectorAll('.custom-tracker').forEach(el => el.remove());
+    if (data.customTrackers) {
+        data.customTrackers.forEach(t => addCustomTracker(t.name, t.max, t.current));
     }
-}
 
-// checkbox adding
-let addcheckbox = document.getElementById("add-check-box");
-let checkboxs = document.getElementById("check-boxs");
-let totalcheckboxs = 0;
-
-addcheckbox.addEventListener("click", function() {
-    totalcheckboxs += 1;
-
-    // Container for each "check-boxs"
-    let chbc = document.createElement('div');
-    chbc.className = "check-boxs-container";
-    chbc.style = 'display: grid; grid-template-columns: 60% 20%; gap: 10px;'
-    checkboxs.appendChild(chbc);
-
-    // Label input
-    let inputforchc = document.createElement('input');
-    inputforchc.placeholder = `check box ${totalcheckboxs}`;
-    inputforchc.className = 'check-box-exstras';
-    chbc.appendChild(inputforchc);
-
-    // Number input (to decide how many checkboxes to add)
-    let inputval = document.createElement('input');
-    inputval.type = 'number';
-    inputval.value = 1;
-    inputval.min = 1;
-    inputval.max = 40;
-    inputval.className = 'inputval';
-    chbc.appendChild(inputval);
-
-    // Div to hold the checkboxes
-    let div = document.createElement('div');
-    div.className = 'check-boxs';
-    chbc.appendChild(div);
-
-    // Delete button for this checkbox group
-    let delBtn = document.createElement('button');
-    delBtn.textContent = 'Delete';
-    delBtn.className = 'delete-btn';
-    delBtn.style.gridColumn = 'span 2';
-    delBtn.style.height = '30px';
-    delBtn.style.width = '70px';
-    delBtn.addEventListener('click', () => {
-        chbc.remove();
-    });
-    chbc.appendChild(delBtn);
-
-    // Function to update checkboxes based on inputval
-    function updateexstra() {
-        let desiredexstra = parseInt(inputval.value) || 0;
-        div.innerHTML = ''; // clear old checkboxes
-        for (let i = 0; i < desiredexstra; i++) {
-            let checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            div.appendChild(checkbox);
-        }
+    // Appearance
+    if (data.appearance && data.appearance.pfp) {
+        elements.pfp.src = data.appearance.pfp;
+        document.getElementById('pfp-viewer').src = data.appearance.pfp;
     }
-    updateexstra();
 
-    // Update whenever the number input changes
-    inputval.addEventListener('input', updateexstra);
-
-    console.log("added check box container thing");
-});
-
-function getCharacterData() {
-    let data = {};
-
-    // Basic info
-    data.name = document.getElementById("chn").value;
-    data.gender = document.getElementById("gender").value;
-    data.race = document.getElementById("race").value;
-    data.class = document.getElementById("class").value;
-    data.background = document.getElementById("background").value;
-    data.level = document.getElementById("level-change").value;
-    data.exstrapoints = document.getElementById("Exstra-points").value;
-    // Save status
-    const statusSel = document.getElementById('status');
-    // Save speed
-    data.speed = document.getElementById("speed-edit")?.value || "";
-    data.status = statusSel ? statusSel.value : null;
-
-    // Coin values
-    data.coins = {
-        credits: document.getElementById("credits").value,
-        doch: document.getElementById("doch").value,
-        renown: document.getElementById("renown").value
+    // Populate Lists
+    const listContainers = {
+        actions: 'actions-container',
+        bonusActions: 'bonus-actions-container',
+        other: 'other-container',
+        traits: 'traits-container',
+        resistances: 'resistances-container',
+        immunities: 'immunities-container',
+        weaknesses: 'weaknesses-container',
+        inventory: 'inventory-container',
+        statusEffects: 'status-effects-container',
+        notes: 'notes-container'
     };
 
-    // Stats
-    data.stats = {};
-    ['ws','bs','str','tn','dex','per','int','wp','fel'].forEach(stat => {
-        let val = document.querySelector(`.stat-edit #${stat}`).value;
-        data.stats[stat] = val;
-    });
+    if (data.lists) {
+        Object.entries(listContainers).forEach(([key, containerId]) => {
+            const container = document.getElementById(containerId);
+            container.querySelectorAll('.list-item-row').forEach(el => el.remove());
 
-
-    // --- Save wounds and stamina checkboxes state ---
-    function getCheckboxStates(container) {
-        return Array.from(container.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
-    }
-    // Wounds
-    let woundsModEl = document.getElementById('wounds-mod');
-    let woundsMod = woundsModEl ? parseInt(woundsModEl.value, 10) : 0;
-    let woundsContainer = document.getElementById('wounds').getElementsByClassName('check-boxs')[0];
-    data.woundsMod = woundsMod;
-    data.woundsChecked = getCheckboxStates(woundsContainer);
-
-    // Stamina
-    let staminaModEl = document.getElementById('stamina-mod');
-    let staminaMod = staminaModEl ? parseInt(staminaModEl.value, 10) : 1;
-    let staminaContainer = document.getElementById('stamina').getElementsByClassName('check-boxs')[0];
-    data.staminaMod = staminaMod;
-    data.staminaChecked = getCheckboxStates(staminaContainer);
-
-
-    // Dynamic text boxes (actions, traits, inventory, etc.)
-    data.textboxes = {};
-    document.querySelectorAll(".textbox-wrapper textarea").forEach(tb => {
-        // Save value and size (rows, cols, inline width/height if set)
-        data.textboxes[tb.id] = {
-            value: tb.value,
-            rows: tb.rows,
-            cols: tb.cols,
-            styleWidth: tb.style.width || null,
-            styleHeight: tb.style.height || null
-        };
-    });
-
-    // Extra checkboxes (save checked state, always save number, label, checked)
-    data.extraCheckboxes = [];
-    document.querySelectorAll(".check-boxs-container").forEach(container => {
-        if (container.id === 'wounds' || container.id === 'stamina') return;
-        let numInput = container.querySelector(".inputval");
-        let labelInput = container.querySelector(".check-box-exstras");
-        let num = numInput ? parseInt(numInput.value) : 1;
-        let label = labelInput ? labelInput.value : '';
-        let checked = Array.from(container.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
-        data.extraCheckboxes.push({number: num, text: label, checked});
-    });
-
-    // Profile picture (save as data URL if available)
-    const pfpImg = document.getElementById('pfp');
-    if (pfpImg) {
-        // If the src is an object URL or file path, try to keep current value;
-        // Prefer a data URL for portability when loading from JSON
-        data.pfpDataUrl = pfpImg.dataset.pfpDataUrl || null;
-        data.pfpSrc = (!data.pfpDataUrl ? pfpImg.src : null);
-    }
-
-    return data;
-};
-
-// Save button logic
-
-// Removed JSON file download logic. Saving is now only to the database via saveCharacterSheet().
-
-
-// --- Status Effects Viewer Logic ---
-function updateStatusEffectsHeaderViewer() {
-    const list = document.getElementById('status-effects-header-list');
-    if (!list) return;
-    list.innerHTML = '';
-    const container = document.getElementById('status-effects-container');
-    if (!container) return;
-    const effects = Array.from(container.querySelectorAll('textarea'))
-        .map(tb => tb.value.trim())
-        .filter(val => val.length > 0);
-    if (effects.length === 0) {
-        list.innerHTML = '<span style="color:#aaa;">No status effects</span>';
-        return;
-    }
-    effects.forEach(effect => {
-        const div = document.createElement('div');
-        div.textContent = effect;
-        list.appendChild(div);
-    });
-}
-
-document.addEventListener('input', function(e) {
-    if (e.target.closest('#status-effects-container')) {
-        updateStatusEffectsHeaderViewer();
-    }
-});
-if (typeof statusEffectsTab !== 'undefined') {
-    statusEffectsTab.addEventListener('click', updateStatusEffectsHeaderViewer);
-}
-document.addEventListener('DOMContentLoaded', updateStatusEffectsHeaderViewer);
-
-// Function to reload all dynamic elements
-
-
-function pagereload() {
-    safeCall(updateWounds);
-    safeCall(updatestamina);
-    safeCall(updategender);
-    safeCall(updaterace);
-    safeCall(updateclass);
-    safeCall(updatebackground);
-    safeCall(updatechn);
-    safeCall(levelload);
-    safeCall(calculatePoints);
-    // Also update cash/status
-    if (typeof updateCashAndSaveStatus === 'function') safeCall(updateCashAndSaveStatus);
-    // Refresh speed display
-    if (typeof speedEdit !== 'undefined' && typeof speedDisplay !== 'undefined') {
-        if (speedEdit && speedDisplay) speedDisplay.value = speedEdit.value;
-    }
-}
-
-// Add Dash bonus action to Bonus Actions tab
-function addDashBonusAction() {
-    const bonusActionsContainer = document.getElementById('bonus-actions-container');
-    if (!bonusActionsContainer) return;
-    // Remove old Dash if present
-    const oldDash = bonusActionsContainer.querySelector('.dash-action');
-    if (oldDash) oldDash.remove();
-    // Get speed value
-    let speedVal = parseInt(document.getElementById('speed').value) || 5;
-    let dashStamina = 1;
-    // Create Dash element
-    const dash = document.createElement('p');
-    dash.className = 'dash-action ';
-    dash.textContent = `Dash [moves ${speedVal * 2} tiles, ${dashStamina} stamina] `;
-    // Insert at top
-    bonusActionsContainer.insertBefore(dash, bonusActionsContainer.firstChild);
-}
-// Update Dash action whenever speed changes
-if (speedEdit) {
-    speedEdit.addEventListener('input', addDashBonusAction);
-}
-document.addEventListener('DOMContentLoaded', addDashBonusAction);
-
-// End of script.js
-// --- Status cash setter ---
-document.addEventListener('DOMContentLoaded', function() {
-    const statusSel = document.getElementById('status');
-    const setCashBtn = document.getElementById('set-cash-btn');
-    const creditsField = document.getElementById('credits');
-    if (statusSel && setCashBtn && creditsField) {
-        setCashBtn.addEventListener('click', function() {
-            let cashAmount = 0;
-            switch (statusSel.value) {
-                case 'Wealthy': cashAmount = 1000; break;
-                case 'Middle': cashAmount = 500; break;
-                case 'Poor': cashAmount = 50; break;
-                case 'Destitute': cashAmount = 0; break;
-                default: cashAmount = 0;
-            }
-            creditsField.value = cashAmount;
-        });
-    }
-});
-// --- Load from JSON and restore UI state ---
-// --- Status cash setter ---
-document.addEventListener('DOMContentLoaded', function() {
-    const statusSel = document.getElementById('status');
-    const creditsField = document.getElementById('credits');
-    if (statusSel && creditsField) {
-        function updateCashAndSaveStatus() {
-            let cashAmount = 0;
-            switch (statusSel.value) {
-                case 'Wealthy': cashAmount = 1000; break;
-                case 'Middle': cashAmount = 500; break;
-                case 'Poor': cashAmount = 50; break;
-                case 'Destitute': cashAmount = 0; break;
-                default: cashAmount = 0;
-            }
-            creditsField.value = cashAmount;
-        }
-        statusSel.addEventListener('change', updateCashAndSaveStatus);
-        // Set initial value on page load
-        updateCashAndSaveStatus();
-    }
-});
-function loadCharacterData(data) {
-        // If requested, close the overlay after loading
-        if (data.closeOverlayOnLoad) {
-            const overly = document.getElementById('overly');
-            if (overly) overly.style.display = 'none';
-            // Reset flag so it doesn't close every time
-            data.closeOverlayOnLoad = false;
-        }
-    // Basic info
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? el.value; };
-    setVal("chn", data.name || "");
-    setVal("gender", data.gender || "");
-    setVal("race", data.race || "");
-    setVal("class", data.class || "");
-    setVal("background", data.background || "");
-    setVal("level-change", data.level ?? 1);
-    setVal("Exstra-points", data.exstrapoints ?? 0);
-    // Restore speed
-    setVal("speed-edit", data.speed ?? 5);
-    setVal("speed", data.speed ?? 5);
-
-    // Reflect editable overlay fields if they exist
-    setVal("chn-edit", data.name || "");
-    setVal("gender-edit", data.gender || "");
-    setVal("race-edit", data.race || "");
-    setVal("class-edit", data.class || "");
-    setVal("background-edit", data.background || "");
-
-    // Coins (optional block if you store them)
-    if (data.coins) {
-        setVal("credits", data.coins.credits);
-        setVal("doch", data.coins.doch);
-        setVal("renown", data.coins.renown);
-    }
-    // Restore status and update credits
-    if (typeof data.status === 'string') {
-        const statusSel = document.getElementById('status');
-        if (statusSel) {
-            statusSel.value = data.status;
-            // Also update credits field to match status
-            let cashAmount = 0;
-            switch (data.status) {
-                case 'Wealthy': cashAmount = 1000; break;
-                case 'Middle': cashAmount = 500; break;
-                case 'Poor': cashAmount = 50; break;
-                case 'Destitute': cashAmount = 0; break;
-                default: cashAmount = 0;
-            }
-        }
-    }
-        // Restore status
-        if (typeof data.status === 'string') {
-            const statusSel = document.getElementById('status');
-            if (statusSel) statusSel.value = data.status;
-        }
-
-    // Stats on editable side drive the rest
-    if (data.stats) {
-        ['ws','bs','str','tn','dex','per','int','wp','fel'].forEach(stat => {
-            const editEl = document.querySelector(`.stat-edit #${stat}`);
-            const dispEl = document.querySelector(`.stat #${stat}`);
-            if (editEl) editEl.value = data.stats[stat] ?? editEl.value;
-            if (dispEl) dispEl.value = data.stats[stat] ?? dispEl.value;
-        });
-    }
-
-    // Wounds/Stamina modifiers
-    setVal("wounds-mod", data.woundsMod);
-    setVal("stamina-mod", data.staminaMod);
-
-    // Restore wounds/stamina checked state after regeneration
-    setTimeout(() => {
-        // Wounds
-        if (Array.isArray(data.woundsChecked)) {
-            let woundsContainer = document.getElementById('wounds').getElementsByClassName('check-boxs')[0];
-            let cbs = woundsContainer.querySelectorAll('input[type="checkbox"]');
-            data.woundsChecked.forEach((v, i) => { if (cbs[i]) cbs[i].checked = v; });
-        }
-        // Stamina
-        if (Array.isArray(data.staminaChecked)) {
-            let staminaContainer = document.getElementById('stamina').getElementsByClassName('check-boxs')[0];
-            let cbs = staminaContainer.querySelectorAll('input[type="checkbox"]');
-            data.staminaChecked.forEach((v, i) => { if (cbs[i]) cbs[i].checked = v; });
-        }
-    }, 0);
-
-    // Recompute dependent UI using existing helpers
-    safeCall(updateWounds);
-    safeCall(updatestamina);
-    safeCall(calculatePoints);
-    safeCall(levelload);
-    safeCall(updaterace);
-    safeCall(updategender);
-    safeCall(updateclass);
-    safeCall(updatebackground);
-    safeCall(updatechn);
-
-    // Restore dynamic textboxes
-    if (data.textboxes) {
-        // Clear all current wrappers
-        document.querySelectorAll(".textbox-wrapper").forEach(w => w.remove());
-
-        Object.entries(data.textboxes).forEach(([id, payload]) => {
-            const match = id.match(/^([a-z\-]+)-textbox-\d+$/i);
-            if (!match) return;
-            const section = match[1];
-            const sectionContainer = document.getElementById(section.toLowerCase() + "-container");
-            if (!sectionContainer) return;
-
-            const textBox = document.createElement("textarea");
-            textBox.rows = (payload && payload.rows) ? payload.rows : 2;
-            textBox.cols = (payload && payload.cols) ? payload.cols : 30;
-            textBox.className = "text-box";
-            textBox.placeholder = id;
-            textBox.id = id;
-            textBox.value = (payload && payload.value) ? payload.value : "";
-
-            // Restore size from loaded data
-            if (payload && payload.styleWidth) textBox.style.width = payload.styleWidth;
-            if (payload && payload.styleHeight) textBox.style.height = payload.styleHeight;
-
-            const deleteBtn = document.createElement("button");
-            deleteBtn.textContent = "X";
-            deleteBtn.className = "delete-btn";
-
-            const wrapper = document.createElement("div");
-            wrapper.className = "textbox-wrapper";
-            wrapper.appendChild(textBox);
-            wrapper.appendChild(deleteBtn);
-
-            deleteBtn.addEventListener("click", () => {
-                sectionContainer.removeChild(wrapper);
-                if (sectionContainer.id === 'status-effects-container') {
-                    if (typeof updateStatusEffectsHeaderViewer === 'function') {
-                        updateStatusEffectsHeaderViewer();
+            if (data.lists[key]) {
+                data.lists[key].forEach(item => {
+                    if (typeof item === 'object' && item !== null) {
+                        addListItem(containerId, item.text, item.width, item.height);
+                    } else {
+                        addListItem(containerId, item);
                     }
-                }
-            });
-
-            sectionContainer.appendChild(wrapper);
-        });
-        if (typeof updateStatusEffectsHeaderViewer === 'function') {
-            updateStatusEffectsHeaderViewer();
-        }
-    }
-
-    // Restore extra checkbox groups
-    if (Array.isArray(data.extraCheckboxes)) {
-        const root = document.getElementById("check-boxs");
-        if (root) {
-            // Remove only dynamically added groups; keep base wounds/stamina
-            root.querySelectorAll('.check-boxs-container').forEach(c => {
-                if (c.id !== 'wounds' && c.id !== 'stamina') c.remove();
-            });
-            if (typeof totalcheckboxs !== "undefined") totalcheckboxs = 0;
-
-            data.extraCheckboxes.forEach(({ number, text, checked }) => {
-                if (typeof totalcheckboxs !== "undefined") totalcheckboxs += 1;
-
-                const chbc = document.createElement("div");
-                chbc.className = "check-boxs-container";
-                chbc.style = "display: grid; grid-template-columns: 60% 20%; gap: 10px;";
-                root.appendChild(chbc);
-
-                const inputforchc = document.createElement("input");
-                inputforchc.placeholder = `check box ${totalcheckboxs || 1}`;
-                inputforchc.className = "check-box-exstras";
-                inputforchc.value = text ?? "";
-                chbc.appendChild(inputforchc);
-
-                const inputval = document.createElement("input");
-                inputval.type = "number";
-                inputval.min = 1;
-                inputval.max = 40;
-                inputval.className = "inputval";
-                inputval.value = (number ?? 1);
-                chbc.appendChild(inputval);
-
-                const div = document.createElement("div");
-                div.className = "check-boxs";
-                chbc.appendChild(div);
-
-                // Add delete button for loaded checkbox group
-                const delBtn = document.createElement('button');
-                delBtn.textContent = 'Delete';
-                delBtn.className = 'delete-btn';
-                delBtn.style.gridColumn = 'span 2';
-                delBtn.style.height = '30px';
-                delBtn.style.width = '70px';
-                delBtn.addEventListener('click', () => {
-                    chbc.remove();
                 });
-                chbc.appendChild(delBtn);
-
-                function renderCheckboxes(checkedArr) {
-                    div.innerHTML = '';
-                    let count = parseInt(inputval.value) || 1;
-                    for (let i = 0; i < count; i++) {
-                        let checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = checkedArr ? !!checkedArr[i] : false;
-                        div.appendChild(checkbox);
-                    }
-                }
-                // Initial render with loaded checked state
-                renderCheckboxes(checked);
-
-                // When number changes, preserve checked state as much as possible
-                inputval.addEventListener('input', () => {
-                    let prevChecked = Array.from(div.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
-                    renderCheckboxes(prevChecked);
-                });
-            });
-        }
+            }
+        });
     }
-// Utility: Count checked checkboxes in a container
-function countCheckedCheckboxes(container) {
-    return Array.from(container.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked).length;
+
+    // Refresh UI
+    updatePointsRemaining();
+    syncEditToDisplay();
 }
 
-    // Ensure tabs are consistent after load
-    safeCall(() => updateTabs('Actions'));
-
-    // Restore profile picture from data URL if present
-    const pfpImg = document.getElementById('pfp');
-    if (pfpImg) {
-        if (data.pfpDataUrl) {
-            pfpImg.src = data.pfpDataUrl;
-            pfpImg.dataset.pfpDataUrl = data.pfpDataUrl;
-        } else if (data.pfpSrc) {
-            pfpImg.src = data.pfpSrc;
-            delete pfpImg.dataset.pfpDataUrl;
-        } else {
-            // fallback: do not change src
+async function loadCharacterFromServer(isAutoLoad = false) {
+    try {
+        const res = await fetch('/data');
+        if (!res.ok) {
+            if (res.status === 401 && !isAutoLoad) {
+                alert("You are not logged in. Please log in to load your character.");
+                window.location.href = '/'; // redirect to login
+            } else if (res.status !== 401) {
+                throw new Error(`Server responded with status: ${res.status}`);
+            }
+            return;
         }
-        const pfpViewer = document.getElementById('pfp-viewer');
-        if (pfpViewer) {
-            pfpViewer.src = pfpImg.src;
+        const body = await res.json();
+        if (body.data && Object.keys(body.data).length > 0) {
+            populateSheet(body.data);
+            if (!isAutoLoad) alert('Character loaded from server.');
+        } else if (!isAutoLoad) {
+            alert('No character data found on server.');
         }
+    } catch (err) {
+        console.error('Failed to load character from server:', err);
+        if (!isAutoLoad) alert('Error loading character from server.');
     }
 }
 
-// Wire up a Load button + file input (if present)
-(() => {
-    const loadBtn = document.getElementById("load-btn");
-    const loadFile = document.getElementById("load-file"); // <input type="file" accept="application/json">
+function loadCharacterFromFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    if (loadBtn && loadFile) {
-        loadBtn.addEventListener("click", () => loadFile.click());
-    }
-
-    if (loadFile) {
-        loadFile.addEventListener("change", async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            try {
-                const text = await file.text();
-                const data = JSON.parse(text);
-                loadCharacterData(data);
-                // Re-run initializers to reattach events and sync UI
-                safeCall(pagereload);
-            } catch (err) {
-                console.error("Failed to load character JSON:", err);
-                alert("Could not load JSON file. See console for details.");
-            } finally {
-                e.target.value = ""; // allow re-selecting the same file
-            }
-        });
-    }
-})();
-
-// Profile picture loader (file input -> image + store data URL)
-(() => {
-    const pfpFile = document.getElementById('pfp-file');
-    const pfpImg = document.getElementById('pfp');
-    const pfpViewer = document.getElementById('pfp-viewer');
-    const pfpBtn = document.getElementById('pfp-btn');
-
-    if (pfpBtn && pfpFile) {
-        pfpBtn.addEventListener('click', () => pfpFile.click());
-    }
-
-    if (pfpFile && pfpImg) {
-        pfpFile.addEventListener('change', async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            try {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const dataUrl = reader.result;
-                    if (typeof dataUrl === 'string') {
-                        pfpImg.src = dataUrl;
-                        if (pfpViewer) pfpViewer.src = dataUrl;
-                        pfpImg.dataset.pfpDataUrl = dataUrl; // keep data URL for saving
-                    }
-                };
-                reader.readAsDataURL(file);
-            } catch (err) {
-                console.error('Failed to load profile picture:', err);
-                alert('Could not load profile picture.');
-            } finally {
-                e.target.value = '';
-            }
-        });
-    }
-})();
-
-// Check who is logged in and display it on the page
-document.addEventListener('DOMContentLoaded', function() {
-    fetch('/whoami')
-        .then(res => res.json())
-        .then(data => {
-            if (data.username) {
-                // Show username somewhere on the page
-                document.body.insertAdjacentHTML('afterbegin', `<div id="user-info">Logged in as: ${data.username}</div>`);
-            } else {
-                // Optionally redirect to login page
-                window.location.href = '/Index.html';
-            }
-        })
-        .catch(() => {
-            window.location.href = '/Index.html';
-        });
-});
-
-// Update redirection to Index.html instead of login.html
-document.addEventListener('DOMContentLoaded', function() {
-    fetch('/whoami')
-        .then(res => res.json())
-        .then(data => {
-            if (data.username) {
-                // Wrap user info and options in a styled div with name at the top and options below
-                const statusEffectsHeader = document.querySelector('.status-effects-header-viewer');
-                if (statusEffectsHeader) {
-                    statusEffectsHeader.insertAdjacentHTML('afterend', `
-                        <div id="user-info" style="background-color: var(--background); padding: 10px; border-radius: 8px; margin-left: 10px;">
-                            <div style="font-weight: bold; margin-bottom: 5px;">Logged in as: ${data.username}</div>
-                            <div style="display: flex; flex-direction: column; gap: 5px;">
-                                <button id="logout-btn" style="padding: 5px; border-radius: 4px; background-color: var(--active); color: var(--accent-color); border: none;">Logout</button>
-                                <button id="change-password-btn" style="padding: 5px; border-radius: 4px; background-color: var(--active); color: var(--accent-color); border: none;">Change Password</button>
-                            </div>
-                        </div>
-                    `);
-
-                    // Add logout functionality
-                    document.getElementById('logout-btn').addEventListener('click', () => {
-                        fetch('/logout', { method: 'POST' })
-                            .then(() => window.location.href = '/Index.html');
-                    });
-
-                    // Add password change functionality
-                    document.getElementById('change-password-btn').addEventListener('click', () => {
-                        const newPassword = prompt('Enter your new password:');
-                        if (newPassword) {
-                            fetch('/change-password', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ password: newPassword })
-                            }).then(res => {
-                                if (res.ok) {
-                                    alert('Password changed successfully!');
-                                } else {
-                                    alert('Failed to change password.');
-                                }
-                            });
-                        }
-                    });
-                }
-
-                // Hide the user info at the top if it exists
-                const topUserInfo = document.getElementById('user-info');
-                if (topUserInfo) {
-                    topUserInfo.style.display = 'none';
-                }
-            } else {
-                window.location.href = '/Index.html';
-            }
-        })
-        .catch(() => {
-            window.location.href = '/Index.html';
-        });
-});
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            populateSheet(data);
+        } catch (err) {
+            console.error("Failed to parse character file", err);
+            alert("Could not load character from file. It might be corrupted.");
+        }
+    };
+    reader.readAsText(file);
+}
